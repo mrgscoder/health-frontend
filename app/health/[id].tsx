@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 
 const WelcomeScreen = () => {
   const handleGetStarted = () => {
-    router.push('/(tabs)'); // navigate to the Index tab (home screen)
+    router.push('/health/forms/Inform'); // navigate to the Index tab (home screen)
   };
 
   const handleAlreadyHaveAccount = () => {
