@@ -1,6 +1,10 @@
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
-import { Text, View, TouchableOpacity, ScrollView, StatusBar } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
+import { Dimensions, SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+
+const { width } = Dimensions.get('window');
+const ICON_SIZE = width > 400 ? 32 : 26;
+const QUICK_ICON_SIZE = width > 400 ? 28 : 22;
 
 export default function Index() {
   const handleCustomizeApp = () => {
@@ -8,142 +12,141 @@ export default function Index() {
     console.log("Customize app pressed");
   };
 
-  const handleQuickAction = (action) => {
+  const handleQuickAction = (action: string) => {
     console.log(`${action} pressed`);
   };
 
   return (
-    <View className="flex-1 bg-[#1a6093]">
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
-      
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#1a6093' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a6093" />
       {/* Header Section */}
-      <View className="bg-[#1a6093] px-6 pt-12 pb-6 shadow-sm">
-        <View className="flex-row items-center justify-between mb-4">
+      <View style={{ backgroundColor: '#1a6093', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 18, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <View>
-            <Text className="text-2xl font-bold text-white">Good Morning</Text>
-            <Text className="text-gray-300">How are you feeling today?</Text>
+            <Text style={{ fontSize: 26, fontWeight: 'bold', color: 'white' }}>Good Morning</Text>
+            <Text style={{ color: '#d1d5db', fontSize: 15 }}>How are you feeling today?</Text>
           </View>
-          <TouchableOpacity className="p-2">
-            <Ionicons name="notifications-outline" size={24} color="#6B7280" />
+          <TouchableOpacity style={{ padding: 8, backgroundColor: '#fff', borderRadius: 20, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 2 }}>
+            <Ionicons name="notifications-outline" size={ICON_SIZE - 6} color="#1a6093" />
           </TouchableOpacity>
         </View>
-        
         {/* Customize App Button */}
         <TouchableOpacity
           onPress={handleCustomizeApp}
-          className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex-row items-center justify-center"
+          style={{ backgroundColor: '#e0f2fe', borderColor: '#bae6fd', borderWidth: 1, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
           activeOpacity={0.8}
         >
-          <Ionicons name="options-outline" size={20} color="#3B82F6" />
-          <Text className="text-blue-600 font-medium ml-2">Customize your app according to you</Text>
+          <Ionicons name="options-outline" size={20} color="#1a6093" />
+          <Text style={{ color: '#1a6093', fontWeight: '600', marginLeft: 8, fontSize: 15 }}>Customize your app according to you</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* Health Overview Card */}
-        <View className="mx-6 mt-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6">
-          <Text className="text-white text-xl font-bold mb-2">Today's Health Overview</Text>
-          <View className="flex-row justify-between items-center">
-            <View className="flex-1">
-              <Text className="text-blue-100 text-sm">Overall Status</Text>
-              <Text className="text-white text-lg font-semibold">Good</Text>
+        <View style={{ marginHorizontal: 24, marginTop: 24, backgroundColor: '#2563eb', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 16, elevation: 4 }}>
+          <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>Today's Health Overview</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#dbeafe', fontSize: 13 }}>Overall Status</Text>
+              <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>Good</Text>
             </View>
-            <View className="bg-white bg-opacity-20 rounded-full p-3">
-              <Ionicons name="heart" size={32} color="white" />
+            <View style={{ backgroundColor: '#fff', opacity: 0.18, borderRadius: 50, padding: 12 }}>
+              <MaterialCommunityIcons name="heart-pulse" size={ICON_SIZE + 4} color="white" />
             </View>
           </View>
         </View>
 
         {/* Quick Actions */}
-        <View className="mx-6 mt-6">
-          <Text className="text-xl font-bold text-gray-800 mb-4">Quick Actions</Text>
-          <View className="flex-row flex-wrap justify-between">
+        <View style={{ marginHorizontal: 24, marginTop: 28 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 16 }}>Quick Actions</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             {[
-              { name: 'Book Appointment', icon: 'calendar-outline', color: 'bg-green-500' },
-              { name: 'Symptoms Check', icon: 'medical-outline', color: 'bg-red-500' },
-              { name: 'Medications', icon: 'pill-outline', color: 'bg-orange-500' },
-              { name: 'Health Records', icon: 'document-text-outline', color: 'bg-blue-500' },
+              { name: 'Book Appointment', icon: 'calendar-check', color: '#22c55e' },
+              { name: 'Symptoms Check', icon: 'stethoscope', color: '#ef4444' },
+              { name: 'Medications', icon: 'pill', color: '#f59e42' },
+              { name: 'Health Records', icon: 'file-document', color: '#3b82f6' },
             ].map((action, index) => (
               <TouchableOpacity
                 key={index}
                 onPress={() => handleQuickAction(action.name)}
-                className="w-[48%] bg-white rounded-2xl p-4 mb-4 shadow-sm"
-                activeOpacity={0.8}
+                style={{ width: '48%', backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}
+                activeOpacity={0.85}
               >
-                <View className={`${action.color} rounded-xl w-12 h-12 items-center justify-center mb-3`}>
-                  <Ionicons name={action.icon} size={24} color="white" />
+                <View style={{ backgroundColor: action.color, borderRadius: 14, width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <MaterialCommunityIcons name={action.icon as any} size={QUICK_ICON_SIZE + 8} color="#fff" />
                 </View>
-                <Text className="text-gray-800 font-medium">{action.name}</Text>
+                <Text style={{ color: '#1e293b', fontWeight: '600', fontSize: 15 }}>{action.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
         {/* Health Stats */}
-        <View className="mx-6 mt-2">
-          <Text className="text-xl font-bold text-gray-800 mb-4">Health Stats</Text>
-          <View className="bg-white rounded-2xl p-6 shadow-sm">
-            <View className="flex-row justify-between items-center mb-4">
-              <View className="flex-1">
-                <Text className="text-gray-600 text-sm">Heart Rate</Text>
-                <Text className="text-2xl font-bold text-red-500">72 BPM</Text>
+        <View style={{ marginHorizontal: 24, marginTop: 10 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 16 }}>Health Stats</Text>
+          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <MaterialCommunityIcons name="heart" size={QUICK_ICON_SIZE + 8} color="#ef4444" />
+                <Text style={{ color: '#64748b', fontSize: 13, marginTop: 2 }}>Heart Rate</Text>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#ef4444' }}>72 BPM</Text>
               </View>
-              <View className="flex-1 items-center">
-                <Text className="text-gray-600 text-sm">Blood Pressure</Text>
-                <Text className="text-2xl font-bold text-blue-500">120/80</Text>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <MaterialCommunityIcons name="water" size={QUICK_ICON_SIZE + 8} color="#3b82f6" />
+                <Text style={{ color: '#64748b', fontSize: 13, marginTop: 2 }}>Blood Pressure</Text>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#3b82f6' }}>120/80</Text>
               </View>
-              <View className="flex-1 items-end">
-                <Text className="text-gray-600 text-sm">Weight</Text>
-                <Text className="text-2xl font-bold text-green-500">68 kg</Text>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <MaterialCommunityIcons name="weight" size={QUICK_ICON_SIZE + 8} color="#22c55e" />
+                <Text style={{ color: '#64748b', fontSize: 13, marginTop: 2 }}>Weight</Text>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#22c55e' }}>68 kg</Text>
               </View>
             </View>
-            <View className="flex-row items-center justify-center">
-              <View className="flex-1 bg-gray-200 rounded-full h-2">
-                <View className="bg-green-500 h-2 rounded-full" style={{ width: '75%' }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ flex: 1, backgroundColor: '#e5e7eb', borderRadius: 8, height: 8 }}>
+                <View style={{ backgroundColor: '#22c55e', height: 8, borderRadius: 8, width: '75%' }} />
               </View>
-              <Text className="text-gray-600 text-sm ml-3">75% Health Score</Text>
+              <Text style={{ color: '#64748b', fontSize: 13, marginLeft: 12 }}>75% Health Score</Text>
             </View>
           </View>
         </View>
 
         {/* Upcoming Appointments */}
-        <View className="mx-6 mt-6 mb-8">
-          <Text className="text-xl font-bold text-gray-800 mb-4">Upcoming Appointments</Text>
-          <View className="bg-white rounded-2xl p-4 shadow-sm">
-            <View className="flex-row items-center">
-              <View className="bg-blue-100 rounded-full p-3 mr-4">
-                <Ionicons name="person-outline" size={24} color="#3B82F6" />
+        <View style={{ marginHorizontal: 24, marginTop: 28, marginBottom: 8 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 16 }}>Upcoming Appointments</Text>
+          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ backgroundColor: '#dbeafe', borderRadius: 50, padding: 10, marginRight: 16 }}>
+                <MaterialCommunityIcons name="doctor" size={QUICK_ICON_SIZE + 4} color="#3b82f6" />
               </View>
-              <View className="flex-1">
-                <Text className="text-gray-800 font-semibold">Dr. Sarah Johnson</Text>
-                <Text className="text-gray-600">General Checkup</Text>
-                <Text className="text-gray-500 text-sm">Tomorrow, 10:00 AM</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#1e293b', fontWeight: '600', fontSize: 16 }}>Dr. Sarah Johnson</Text>
+                <Text style={{ color: '#64748b', fontSize: 14 }}>General Checkup</Text>
+                <Text style={{ color: '#94a3b8', fontSize: 13 }}>Tomorrow, 10:00 AM</Text>
               </View>
-              <TouchableOpacity className="bg-blue-500 rounded-full px-4 py-2">
-                <Text className="text-white text-sm font-medium">View</Text>
+              <TouchableOpacity style={{ backgroundColor: '#3b82f6', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 }}>
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>View</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
 
         {/* Health Tips */}
-        <View className="mx-6 mb-8">
-          <Text className="text-xl font-bold text-gray-800 mb-4">Daily Health Tip</Text>
-          <View className="bg-gradient-to-r from-green-400 to-blue-500 rounded-2xl p-6">
-            <View className="flex-row items-start">
-              <View className="bg-white bg-opacity-20 rounded-full p-2 mr-4">
-                <Ionicons name="bulb-outline" size={20} color="white" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-white font-semibold mb-2">Stay Hydrated</Text>
-                <Text className="text-white text-sm opacity-90">
-                  Drink at least 8 glasses of water daily to keep your body hydrated and maintain optimal health.
-                </Text>
-              </View>
+        <View style={{ marginHorizontal: 24, marginBottom: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#1e293b', marginBottom: 16 }}>Daily Health Tip</Text>
+          <View style={{ backgroundColor: '#4ade80', borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'flex-start' }}>
+            <View style={{ backgroundColor: '#fff', opacity: 0.18, borderRadius: 50, padding: 8, marginRight: 16 }}>
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={QUICK_ICON_SIZE + 2} color="white" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16, marginBottom: 4 }}>Stay Hydrated</Text>
+              <Text style={{ color: 'white', fontSize: 14, opacity: 0.95 }}>
+                Drink at least 8 glasses of water daily to keep your body hydrated and maintain optimal health.
+              </Text>
             </View>
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

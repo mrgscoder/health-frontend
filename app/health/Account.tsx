@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StatusBar, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const Account = () => {
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <View className="flex-1 bg-white">
@@ -19,45 +21,59 @@ const Account = () => {
       </View>
 
       <View className="flex-1 px-4">
-        {/* Phone Input */}
+        {/* Email Input */}
         <View className="mb-4">
-          <View className="flex-row items-center bg-white rounded-lg border border-black overflow-hidden">
-            <View className="px-4 py-3 border-r border-black">
-              <Text className="text-gray-300">+91</Text>
-            </View>
-            <TextInput
-              className="flex-1 px-4 py-3 text-white"
-              placeholder="Phone nu..."
-              placeholderTextColor="#9ca3af"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-            <TouchableOpacity className="px-4 py-3 bg-teal-50 rounded-full">
-              <Text className="text-gray-300 text-xs font-medium">GET CODE</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Verification Code Input */}
-        <View className="mb-6">
           <TextInput
-            className="w-full px-4 py-3 bg-white text-white rounded-lg border border-black"
-            placeholder="Verification code"
+            className="w-full px-4 py-3 bg-white text-black rounded-lg border border-black"
+            placeholder="Email address"
             placeholderTextColor="#9ca3af"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
         </View>
 
-        {/* Image between Sign In and Social Buttons */}
+        {/* Password Input */}
+        <View className="mb-4 relative">
+          <TextInput
+            className="w-full px-4 py-3 pr-12 bg-white text-black rounded-lg border border-black"
+            placeholder="Password"
+            placeholderTextColor="#9ca3af"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            className="absolute right-4 top-3"
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Ionicons
+              name={showPassword ? 'eye-off' : 'eye'}
+              size={20}
+              color="#9ca3af"
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Forgot Password */}
+        <View className="items-end mb-6">
+          <TouchableOpacity>
+            <Text className="text-blue-400 text-sm">Forgot Password?</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Image in Center */}
         <View className="items-center mb-8 mt-8">
           <Image
             source={require('../../assets/images/account.png')}
-            className="w-40 h-40"
+            className="w-56 h-56"
             resizeMode="contain"
           />
+          <Text className="text-center text-gray-600 mt-4 px-6 text-lg italic">
+            Your health is an investment, not an expense. Take care of your body, it's the only place you have to live.
+          </Text>
         </View>
 
         {/* Sign In Button */}
@@ -69,23 +85,8 @@ const Account = () => {
 
         {/* Social Sign In Buttons */}
         <View>
-          <TouchableOpacity className="w-full py-3 bg-white rounded-3xl border border-gray-600 flex-row items-center justify-center mb-6">
-            <View className="w-7 h-7 mr-3 items-center justify-center">
-              <Image
-                source={require('../../assets/images/google.png')}
-                className="w-7 h-7"
-                resizeMode="contain"
-              />
-            </View>
-            <Text className="text-black font-medium">SIGN IN WITH GOOGLE</Text>
-          </TouchableOpacity>
+          
 
-          <TouchableOpacity className="w-full py-3 bg-blue-600 rounded-3xl flex-row items-center justify-center mb-6">
-            <View className="w-5 h-5 mr-3 bg-white rounded items-center justify-center">
-              <Text className="text-blue-600 text-xs font-bold">f</Text>
-            </View>
-            <Text className="text-white font-medium">SIGN IN WITH FACEBOOK</Text>
-          </TouchableOpacity>
 
        
         </View>

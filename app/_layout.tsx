@@ -27,7 +27,7 @@ export default function RootLayout() {
       }}
     />
      <Stack.Screen
-      name="health/forms/Signup"
+      name="health/forms"
       options={{
         headerShown: false,
       }}

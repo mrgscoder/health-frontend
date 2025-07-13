@@ -7,6 +7,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { MaterialCommunityIcons, Feather, FontAwesome5 } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 interface LifestyleData {
   activityLevel: string;
@@ -15,8 +16,8 @@ interface LifestyleData {
 }
 
 interface LifestyleFormProps {
-  onNext: (data: LifestyleData) => void;
-  onBack: () => void;
+  onNext?: (data: LifestyleData) => void;
+  onBack?: () => void;
 }
 
 const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
@@ -58,7 +59,24 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
       sleepHours: selectedSleepHours,
       dietPreference: selectedDietPreference,
     };
-    onNext(data);
+    
+    if (onNext) {
+      onNext(data);
+    } else {
+      // Default behavior when used as standalone page
+      // Navigate to the next step in the form flow
+      router.push('/health/forms/Wellness');
+    }
+  };
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      // Default behavior when used as standalone page
+      // Navigate back to the previous step
+      router.back();
+    }
   };
 
   const OptionButton = ({
@@ -154,11 +172,18 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
         )}
 
         {/* Navigation Buttons */}
-       
-        <View className="mt-1 mb-10">
+        <View className="mt-1 mb-10 flex-row justify-between">
+          <TouchableOpacity
+            onPress={handleBack}
+            className="bg-gray-200 py-3 px-6 rounded-lg"
+            activeOpacity={0.8}
+          >
+            <Text className="text-gray-700 font-semibold">BACK</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity
             onPress={handleNext}
-            className="bg-[#0cb6ab] py-3 rounded-lg items-center"
+            className="bg-[#0cb6ab] py-3 px-6 rounded-lg"
             activeOpacity={0.8}
           >
             <Text className="text-white font-semibold">NEXT</Text>

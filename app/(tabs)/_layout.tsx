@@ -1,30 +1,48 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
-import { Tabs } from 'expo-router'
+import { FontAwesome5, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import React from 'react';
+import { StyleSheet } from 'react-native';
 
 const _layout = () => {
   return (
    <Tabs>
      <Tabs.Screen
-      name="index"         
+      name="Index"         
       options={{
         title: 'Home',
-        headerShown: false
+        headerShown: false,
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons name="home-variant" size={size} color={color} />
+        ),
       }}/>
-   <Tabs.Screen
-      name="search"         
+     <Tabs.Screen
+      name="Food"         
       options={{
-        title: 'Search',
-        headerShown: false
+        title: 'food',
+        headerShown: false,
+        tabBarIcon: ({ color, size }) => (
+          <FontAwesome5 name="user-circle" size={size} color={color} />
+        ),
       }}/>
-        <Tabs.Screen
-      name="profile"         
+      <Tabs.Screen
+      name="Water"  
       options={{
-        title: 'Profile',
-        headerShown: false
+        title: 'Water',
+        headerShown: false,
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons name="water" size={size} color={color} />
+        ),
       }}/>
-
-      </Tabs>
+      <Tabs.Screen
+      name="Tracker"
+      options={{
+        title: 'Tracker',
+        headerShown: false,
+        tabBarIcon: ({ color, size }) => (
+          <MaterialCommunityIcons name="bookmark" size={size} color={color} />
+        ),
+      }}/>
+   </Tabs>
   )
 }
 
