@@ -1,13 +1,12 @@
-import { FontAwesome5, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet } from 'react-native';
 
 const _layout = () => {
   return (
    <Tabs>
      <Tabs.Screen
-      name="Index"         
+      name="index"         
       options={{
         title: 'Home',
         headerShown: false,
@@ -16,7 +15,7 @@ const _layout = () => {
         ),
       }}/>
      <Tabs.Screen
-      name="Food"         
+      name="food"         
       options={{
         title: 'food',
         headerShown: false,
@@ -25,7 +24,7 @@ const _layout = () => {
         ),
       }}/>
       <Tabs.Screen
-      name="Water"  
+      name="water"  
       options={{
         title: 'Water',
         headerShown: false,
@@ -34,7 +33,7 @@ const _layout = () => {
         ),
       }}/>
       <Tabs.Screen
-      name="Tracker"
+      name="tracker"
       options={{
         title: 'Tracker',
         headerShown: false,
@@ -47,5 +46,3 @@ const _layout = () => {
 }
 
 export default _layout
-
-const styles = StyleSheet.create({})

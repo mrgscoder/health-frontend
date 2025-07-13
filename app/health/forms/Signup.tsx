@@ -62,7 +62,7 @@ const SignUpPage = () => {
       // Save user's full name and gender to AsyncStorage
       await AsyncStorage.setItem('userFullName', formData.fullName);
       await AsyncStorage.setItem('userGender', formData.gender);
-      router.push('/(tabs)/Index');
+      router.push('/(tabs)/food');
     } catch (error) {
       alert('Error: Something went wrong. Please try again.');
     } finally {

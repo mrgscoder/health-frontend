@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StatusBar, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 const Account = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const handleSignIn = () => {
+    router.push('/health/forgot');
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -59,7 +64,7 @@ const Account = () => {
 
         {/* Forgot Password */}
         <View className="items-end mb-6">
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/health/forgot')}>
             <Text className="text-blue-400 text-sm">Forgot Password?</Text>
           </TouchableOpacity>
         </View>
@@ -78,7 +83,10 @@ const Account = () => {
 
         {/* Sign In Button */}
         <View className="items-center">
-          <TouchableOpacity className="w-full py-3 mb-8 bg-[#0cb6ab] rounded-3xl">
+          <TouchableOpacity 
+            className="w-full py-3 mb-8 bg-[#0cb6ab] rounded-3xl"
+            onPress={handleSignIn}
+          >
             <Text className="text-white text-center font-medium">SIGN IN</Text>
           </TouchableOpacity>
         </View>

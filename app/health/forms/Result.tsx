@@ -12,6 +12,7 @@ interface ResultParams {
   dietPreference: string;
   stressLevel: 'Low' | 'Moderate' | 'High';
   healthGoal: string;
+  name?: string;
 }
 
 interface ResultProps {
@@ -41,7 +42,7 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
     stressLevel = 'Moderate',
     healthGoal = 'Maintain Weight',
     name = '',
-  } = route?.params || {} as Partial<ResultParams & { name?: string }>;
+  } = route?.params || {} as Partial<ResultParams>;
 
   // Prefer props over route params when provided
   let height = typeof propHeight === 'string' ? parseFloat(propHeight) : propHeight ?? routeHeight;
@@ -56,8 +57,9 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
   }
 
   // Calculate BMI
-  const bmi = (weightKg / (((height as number) / 100) ** 2)).toFixed(1);
-  const bmiCategory = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Healthy' : bmi < 30 ? 'Overweight' : 'Obese';
+  const bmiValue = (weightKg / (((height as number) / 100) ** 2));
+  const bmi = bmiValue.toFixed(1);
+  const bmiCategory = bmiValue < 18.5 ? 'Underweight' : bmiValue < 25 ? 'Healthy' : bmiValue < 30 ? 'Overweight' : 'Obese';
 
   // Calculate Health Score (simplified logic based on previous table)
   const activityScore = {
@@ -93,7 +95,14 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
 
   // Navigate to the signup screen when the CTA button is pressed
   const handleNavigateSignup = () => {
-    router.push('/health/forms/Signup');
+    try {
+      // Navigate to the signup form
+      router.push('/health/forms/Signup');
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback to tabs if signup navigation fails
+      router.push('(tabs)');
+    }
   };
 
   if (loading) {

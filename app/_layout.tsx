@@ -32,5 +32,11 @@ export default function RootLayout() {
         headerShown: false,
       }}
     />
+    <Stack.Screen
+      name="health/forgot"
+      options={{
+        headerShown: false,
+      }}
+    />
   </Stack>;
 }
