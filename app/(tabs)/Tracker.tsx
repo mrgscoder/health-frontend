@@ -1,693 +1,216 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Modal,
-  TextInput,
-  Alert,
-  StatusBar,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
-interface HealthData {
-  id: string;
-  type: 'sugar' | 'bloodPressure' | 'weight' | 'medicines' | 'doctors';
-  value: any;
-  date: string;
-  time: string;
-}
+const { width } = Dimensions.get('window');
 
-interface SugarData {
-  level: string;
-  unit: 'mg/dL' | 'mmol/L';
-  mealTime: 'before' | 'after' | 'fasting';
-}
-
-interface BloodPressureData {
-  systolic: string;
-  diastolic: string;
-  pulse: string;
-}
-
-interface WeightData {
-  weight: string;
-  unit: 'kg' | 'lbs';
-  bmi?: string;
-}
-
-interface MedicineData {
-  name: string;
-  dosage: string;
-  frequency: string;
-  notes: string;
-}
-
-interface DoctorData {
-  name: string;
-  specialty: string;
-  date: string;
-  notes: string;
-}
-
-const featureList = [
-  {
-    key: 'stepCount',
-    label: 'Step Count',
-    icon: <MaterialCommunityIcons name="walk" size={24} color="#0cb6ab" />,
-  },
-  {
-    key: 'sugar',
-    label: 'Log Sugar',
-    icon: <MaterialCommunityIcons name="water" size={24} color="#0cb6ab" />,
-  },
-  {
-    key: 'weight',
-    label: 'Track Weight',
-    icon: <FontAwesome5 name="weight" size={22} color="#0cb6ab" />,
-  },
-  {
-    key: 'bloodPressure',
-    label: 'Blood Pressure',
-    icon: <MaterialCommunityIcons name="heart-pulse" size={24} color="#0cb6ab" />,
-  },
-  {
-    key: 'medicines',
-    label: 'Track Medicine',
-    icon: <MaterialCommunityIcons name="pill" size={24} color="#0cb6ab" />,
-  },
-  {
-    key: 'doctors',
-    label: 'Doctor',
-    icon: <MaterialCommunityIcons name="doctor" size={24} color="#0cb6ab" />,
-  },
-  {
-    key: 'heartRate',
-    label: 'Heart Rate',
-    icon: <MaterialCommunityIcons name="heart" size={24} color="#0cb6ab" />,
-  },
-];
-
-const Tracker: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sugar' | 'bloodPressure' | 'weight' | 'medicines' | 'doctors'>('weight');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [healthData, setHealthData] = useState<HealthData[]>([]);
-  
-  // Form states
-  const [sugarForm, setSugarForm] = useState<SugarData>({
-    level: '',
-    unit: 'mg/dL',
-    mealTime: 'before'
-  });
-  
-  const [bpForm, setBpForm] = useState<BloodPressureData>({
-    systolic: '',
-    diastolic: '',
-    pulse: ''
-  });
-  
-  const [weightForm, setWeightForm] = useState<WeightData>({
-    weight: '',
-    unit: 'kg',
-    bmi: ''
-  });
-  
-  const [medicineForm, setMedicineForm] = useState<MedicineData>({
-    name: '',
-    dosage: '',
-    frequency: '',
-    notes: ''
-  });
-  
-  const [doctorForm, setDoctorForm] = useState<DoctorData>({
-    name: '',
-    specialty: '',
-    date: '',
-    notes: ''
+const StepCounter = () => {
+  const insets = useSafeAreaInsets();
+  const [currentDay, setCurrentDay] = useState(new Date().getDay());
+  const [stepData, setStepData] = useState<{ [key: number]: { steps: number; miles: number; minutes: number; calories: number; floors: number } }>({
+    0: { steps: 4200, miles: 2.1, minutes: 63, calories: 254, floors: 1 }, // Sunday
+    1: { steps: 6800, miles: 3.4, minutes: 102, calories: 408, floors: 3 }, // Monday
+    2: { steps: 7200, miles: 3.6, minutes: 108, calories: 432, floors: 2 }, // Tuesday
+    3: { steps: 5700, miles: 2.7, minutes: 81, calories: 321, floors: 2 }, // Wednesday (today)
+    4: { steps: 8100, miles: 4.1, minutes: 122, calories: 486, floors: 4 }, // Thursday
+    5: { steps: 3200, miles: 1.6, minutes: 48, calories: 192, floors: 1 }, // Friday
+    6: { steps: 2800, miles: 1.4, minutes: 42, calories: 168, floors: 1 }, // Saturday
   });
 
-  const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
+  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const currentData = stepData[currentDay];
+  const goalSteps = 10000;
+  const progressPercentage = Math.min((currentData.steps / goalSteps) * 100, 100);
 
-  const tabConfig = [
-    { key: 'sugar', title: 'Sugar', icon: 'water' },
-    { key: 'bloodPressure', title: 'Blood Pressure', icon: 'heart' },
-    { key: 'weight', title: 'Weight', icon: 'scale' },
-    { key: 'medicines', title: 'Medicines', icon: 'medical' },
-    { key: 'doctors', title: 'Doctors', icon: 'person' },
-  ];
+  // Circle parameters
+  const radius = 90;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDasharray = circumference;
+  const strokeDashoffset = circumference - (progressPercentage / 100) * circumference;
 
-  const handleAddNew = () => {
-    setModalVisible(true);
-  };
-
-  const handleSave = () => {
-    const currentDate = new Date();
-    const dateString = currentDate.toLocaleDateString();
-    const timeString = currentDate.toLocaleTimeString();
-    
-    let newData: HealthData = {
-      id: Date.now().toString(),
-      type: activeTab,
-      value: {},
-      date: dateString,
-      time: timeString,
-    };
-
-    switch (activeTab) {
-      case 'sugar':
-        if (!sugarForm.level) {
-          Alert.alert('Error', 'Please enter sugar level');
-          return;
-        }
-        newData.value = sugarForm;
-        break;
-      case 'bloodPressure':
-        if (!bpForm.systolic || !bpForm.diastolic) {
-          Alert.alert('Error', 'Please enter both systolic and diastolic values');
-          return;
-        }
-        newData.value = bpForm;
-        break;
-      case 'weight':
-        if (!weightForm.weight) {
-          Alert.alert('Error', 'Please enter weight');
-          return;
-        }
-        newData.value = weightForm;
-        break;
-      case 'medicines':
-        if (!medicineForm.name || !medicineForm.dosage) {
-          Alert.alert('Error', 'Please enter medicine name and dosage');
-          return;
-        }
-        newData.value = medicineForm;
-        break;
-      case 'doctors':
-        if (!doctorForm.name || !doctorForm.specialty) {
-          Alert.alert('Error', 'Please enter doctor name and specialty');
-          return;
-        }
-        newData.value = doctorForm;
-        break;
+  const navigateDay = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      setCurrentDay((prev) => (prev === 0 ? 6 : prev - 1));
+    } else {
+      setCurrentDay((prev) => (prev === 6 ? 0 : prev + 1));
     }
-
-    setHealthData([...healthData, newData]);
-    setModalVisible(false);
-    resetForms();
-    Alert.alert('Success', 'Data saved successfully!');
   };
 
-  const resetForms = () => {
-    setSugarForm({ level: '', unit: 'mg/dL', mealTime: 'before' });
-    setBpForm({ systolic: '', diastolic: '', pulse: '' });
-    setWeightForm({ weight: '', unit: 'kg', bmi: '' });
-    setMedicineForm({ name: '', dosage: '', frequency: '', notes: '' });
-    setDoctorForm({ name: '', specialty: '', date: '', notes: '' });
-  };
-
-  const renderTabContent = () => {
-    const currentData = healthData.filter(item => item.type === activeTab);
+  const getCompletionLevel = (dayIndex: number) => {
+    const steps = stepData[dayIndex].steps;
+    const percentage = (steps / goalSteps) * 100;
     
-    if (currentData.length === 0) {
-      return (
-        <View className="flex-1 justify-center items-center px-4">
-          <Text className="text-gray-400 text-center text-base mb-4">
-            Track your {activeTab === 'bloodPressure' ? 'blood pressure' : activeTab} here
-          </Text>
-          <Text className="text-gray-500 text-center text-sm">
-            Click Add New to enter your {activeTab === 'bloodPressure' ? 'blood pressure' : activeTab}. 
-            Also view the graphical trends/history to know how you are scoring
-          </Text>
-        </View>
-      );
-    }
+    if (percentage >= 100) return 'complete';
+    if (percentage >= 75) return 'high';
+    if (percentage >= 50) return 'medium';
+    if (percentage >= 25) return 'low';
+    return 'minimal';
+  };
 
+  const getDayCircleColors = (dayIndex: number): string[] | null => {
+    // Unique gradients for each day
+    const gradients = [
+      ['#dffd6e', '#14b8a6'],    // Sunday
+      ['#fbbf24', '#f59e42'],    // Monday
+      ['#f472b6', '#a78bfa'],    // Tuesday
+      ['#60a5fa', '#2563eb'],    // Wednesday
+      ['#f87171', '#fbbf24'],    // Thursday
+      ['#34d399', '#10b981'],    // Friday
+      ['#a3e635', '#f472b6'],    // Saturday
+    ];
+    return gradients[dayIndex % 7];
+  };
+
+  const ProgressCircle = () => (
+    <View className="w-[200px] h-[200px] items-center justify-center">
+      <Svg width="200" height="200" style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <Defs>
+          <SvgLinearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#065f46" />
+            <Stop offset="25%" stopColor="#0891b2" />
+            <Stop offset="50%" stopColor="#0cb6ab" />
+            <Stop offset="75%" stopColor="#14b8a6" />
+            <Stop offset="100%" stopColor="#6ee7b7" />
+          </SvgLinearGradient>
+        </Defs>
+        {/* Background circle */}
+        <Circle
+          cx="100"
+          cy="100"
+          r={radius}
+          stroke="#FFFF"
+          strokeWidth="8"
+          fill="none"
+        />
+        {/* Progress circle */}
+        <Circle
+          cx="100"
+          cy="100"
+          r={radius}
+          stroke="url(#progressGradient)"
+          strokeWidth="8"
+          fill="none"
+          strokeDasharray={strokeDasharray}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+        />
+      </Svg> 
+      {/* Center text */}
+      <View className="items-center justify-center">
+        <Text className="text-[40px] font-bold text-black mb-1">
+          {currentData.steps.toLocaleString()}
+        </Text>
+        <Text className="text-xs text-gray-400 tracking-wider">
+          STEPS
+        </Text>
+      </View>
+    </View>
+  );
+
+  interface DayCircleProps {
+    dayIndex: number;
+    dayName: string;
+  }
+
+  const DayCircle = ({ dayIndex, dayName }: DayCircleProps) => {
+    let colors = getDayCircleColors(dayIndex);
+    const isSelected = dayIndex === currentDay;
+    const level = getCompletionLevel(dayIndex);
+    // Ensure colors is always a tuple of at least two strings for LinearGradient
+    if (!colors) {
+      colors = ['#6b7280', '#6b7280'];
+    } else if (colors.length === 1) {
+      colors = [colors[0], colors[0]];
+    }
     return (
-      <ScrollView className="flex-1 px-4 mt-4">
-        {currentData.map((item) => (
-          <View key={item.id} className="bg-gray-800 rounded-lg p-4 mb-3">
-            <View className="flex-row justify-between items-center mb-2">
-              <Text className="text-white font-semibold">
-                {item.date} - {item.time}
-              </Text>
-            </View>
-            {renderDataContent(item)}
-          </View>
-        ))}
-      </ScrollView>
+      <TouchableOpacity
+        onPress={() => setCurrentDay(dayIndex)}
+        className="items-center mx-1"
+      >
+        <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'border-2 border-white' : ''}`}> 
+          {colors ? (
+            <LinearGradient
+              colors={colors as [string, string]}
+              style={{
+                width: isSelected ? 28 : 32,
+                height: isSelected ? 28 : 32,
+                borderRadius: isSelected ? 14 : 16
+              }}
+            />
+          ) : (
+            <View className="w-8 h-8 rounded-full border-2 border-gray-400" />
+          )}
+        </View>
+        <Text className="text-[10px] text-gray-400 mt-2">{dayName}</Text>
+      </TouchableOpacity>
     );
   };
 
-  const renderDataContent = (item: HealthData) => {
-    switch (item.type) {
-      case 'sugar':
-        return (
-          <View>
-            <Text className="text-teal-400 text-lg font-bold">
-              {item.value.level} {item.value.unit}
-            </Text>
-            <Text className="text-gray-400 text-sm capitalize">
-              {item.value.mealTime} meal
-            </Text>
-          </View>
-        );
-      case 'bloodPressure':
-        return (
-          <View>
-            <Text className="text-teal-400 text-lg font-bold">
-              {item.value.systolic}/{item.value.diastolic} mmHg
-            </Text>
-            {item.value.pulse && (
-              <Text className="text-gray-400 text-sm">
-                Pulse: {item.value.pulse} bpm
-              </Text>
-            )}
-          </View>
-        );
-      case 'weight':
-        return (
-          <View>
-            <Text className="text-teal-400 text-lg font-bold">
-              {item.value.weight} {item.value.unit}
-            </Text>
-            {item.value.bmi && (
-              <Text className="text-gray-400 text-sm">
-                BMI: {item.value.bmi}
-              </Text>
-            )}
-          </View>
-        );
-      case 'medicines':
-        return (
-          <View>
-            <Text className="text-teal-400 text-lg font-bold">
-              {item.value.name}
-            </Text>
-            <Text className="text-gray-400 text-sm">
-              {item.value.dosage} - {item.value.frequency}
-            </Text>
-            {item.value.notes && (
-              <Text className="text-gray-500 text-sm mt-1">
-                {item.value.notes}
-              </Text>
-            )}
-          </View>
-        );
-      case 'doctors':
-        return (
-          <View>
-            <Text className="text-teal-400 text-lg font-bold">
-              Dr. {item.value.name}
-            </Text>
-            <Text className="text-gray-400 text-sm">
-              {item.value.specialty}
-            </Text>
-            {item.value.notes && (
-              <Text className="text-gray-500 text-sm mt-1">
-                {item.value.notes}
-              </Text>
-            )}
-          </View>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const renderModalContent = () => {
-    switch (activeTab) {
-      case 'sugar':
-        return (
-          <View className="space-y-4">
-            <Text className="text-white text-xl font-bold mb-4">Add Sugar Level</Text>
-            
-            <View>
-              <Text className="text-gray-300 mb-2">Sugar Level</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter sugar level"
-                placeholderTextColor="#9CA3AF"
-                value={sugarForm.level}
-                onChangeText={(text) => setSugarForm({...sugarForm, level: text})}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Unit</Text>
-              <View className="flex-row space-x-2">
-                <TouchableOpacity
-                  className={`flex-1 p-3 rounded-lg ${sugarForm.unit === 'mg/dL' ? 'bg-teal-600' : 'bg-gray-700'}`}
-                  onPress={() => setSugarForm({...sugarForm, unit: 'mg/dL'})}
-                >
-                  <Text className="text-white text-center">mg/dL</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className={`flex-1 p-3 rounded-lg ${sugarForm.unit === 'mmol/L' ? 'bg-teal-600' : 'bg-gray-700'}`}
-                  onPress={() => setSugarForm({...sugarForm, unit: 'mmol/L'})}
-                >
-                  <Text className="text-white text-center">mmol/L</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Meal Time</Text>
-              <View className="flex-row space-x-2">
-                {['before', 'after', 'fasting'].map((time) => (
-                  <TouchableOpacity
-                    key={time}
-                    className={`flex-1 p-3 rounded-lg ${sugarForm.mealTime === time ? 'bg-teal-600' : 'bg-gray-700'}`}
-                    onPress={() => setSugarForm({...sugarForm, mealTime: time as any})}
-                  >
-                    <Text className="text-white text-center capitalize">{time}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-        );
-
-      case 'bloodPressure':
-        return (
-          <View className="space-y-4">
-            <Text className="text-white text-xl font-bold mb-4">Add Blood Pressure</Text>
-            
-            <View>
-              <Text className="text-gray-300 mb-2">Systolic (mmHg)</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter systolic pressure"
-                placeholderTextColor="#9CA3AF"
-                value={bpForm.systolic}
-                onChangeText={(text) => setBpForm({...bpForm, systolic: text})}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Diastolic (mmHg)</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter diastolic pressure"
-                placeholderTextColor="#9CA3AF"
-                value={bpForm.diastolic}
-                onChangeText={(text) => setBpForm({...bpForm, diastolic: text})}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Pulse (bpm) - Optional</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter pulse rate"
-                placeholderTextColor="#9CA3AF"
-                value={bpForm.pulse}
-                onChangeText={(text) => setBpForm({...bpForm, pulse: text})}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-        );
-
-      case 'weight':
-        return (
-          <View className="space-y-4">
-            <Text className="text-white text-xl font-bold mb-4">Add Weight</Text>
-            
-            <View>
-              <Text className="text-gray-300 mb-2">Weight</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter weight"
-                placeholderTextColor="#9CA3AF"
-                value={weightForm.weight}
-                onChangeText={(text) => setWeightForm({...weightForm, weight: text})}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Unit</Text>
-              <View className="flex-row space-x-2">
-                <TouchableOpacity
-                  className={`flex-1 p-3 rounded-lg ${weightForm.unit === 'kg' ? 'bg-teal-600' : 'bg-gray-700'}`}
-                  onPress={() => setWeightForm({...weightForm, unit: 'kg'})}
-                >
-                  <Text className="text-white text-center">kg</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className={`flex-1 p-3 rounded-lg ${weightForm.unit === 'lbs' ? 'bg-teal-600' : 'bg-gray-700'}`}
-                  onPress={() => setWeightForm({...weightForm, unit: 'lbs'})}
-                >
-                  <Text className="text-white text-center">lbs</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">BMI - Optional</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter BMI"
-                placeholderTextColor="#9CA3AF"
-                value={weightForm.bmi}
-                onChangeText={(text) => setWeightForm({...weightForm, bmi: text})}
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-        );
-
-      case 'medicines':
-        return (
-          <View className="space-y-4">
-            <Text className="text-white text-xl font-bold mb-4">Add Medicine</Text>
-            
-            <View>
-              <Text className="text-gray-300 mb-2">Medicine Name</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter medicine name"
-                placeholderTextColor="#9CA3AF"
-                value={medicineForm.name}
-                onChangeText={(text) => setMedicineForm({...medicineForm, name: text})}
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Dosage</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="e.g., 500mg"
-                placeholderTextColor="#9CA3AF"
-                value={medicineForm.dosage}
-                onChangeText={(text) => setMedicineForm({...medicineForm, dosage: text})}
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Frequency</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="e.g., Twice daily"
-                placeholderTextColor="#9CA3AF"
-                value={medicineForm.frequency}
-                onChangeText={(text) => setMedicineForm({...medicineForm, frequency: text})}
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Notes - Optional</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Additional notes"
-                placeholderTextColor="#9CA3AF"
-                value={medicineForm.notes}
-                onChangeText={(text) => setMedicineForm({...medicineForm, notes: text})}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-          </View>
-        );
-
-      case 'doctors':
-        return (
-          <View className="space-y-4">
-            <Text className="text-white text-xl font-bold mb-4">Add Doctor Visit</Text>
-            
-            <View>
-              <Text className="text-gray-300 mb-2">Doctor Name</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Enter doctor name"
-                placeholderTextColor="#9CA3AF"
-                value={doctorForm.name}
-                onChangeText={(text) => setDoctorForm({...doctorForm, name: text})}
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Specialty</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="e.g., Cardiologist"
-                placeholderTextColor="#9CA3AF"
-                value={doctorForm.specialty}
-                onChangeText={(text) => setDoctorForm({...doctorForm, specialty: text})}
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Visit Date</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="e.g., 2024-01-15"
-                placeholderTextColor="#9CA3AF"
-                value={doctorForm.date}
-                onChangeText={(text) => setDoctorForm({...doctorForm, date: text})}
-              />
-            </View>
-
-            <View>
-              <Text className="text-gray-300 mb-2">Notes - Optional</Text>
-              <TextInput
-                className="bg-gray-700 text-white p-3 rounded-lg"
-                placeholder="Visit notes or recommendations"
-                placeholderTextColor="#9CA3AF"
-                value={doctorForm.notes}
-                onChangeText={(text) => setDoctorForm({...doctorForm, notes: text})}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-          </View>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  // Only show tracker UI for supported features
-  const trackerTabs = ['sugar', 'bloodPressure', 'weight', 'medicines', 'doctors'];
-
-  // Render landing section and feature list
-  const renderLanding = () => (
-    <ScrollView className="flex-1 bg-white">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
-      <View className="items-center mt-8 mb-4 px-4">
-        <Image
-          source={require('../../assets/images/doctor.jpg')}
-          style={{ width: 180, height: 170, marginBottom: 16 }}
-          resizeMode="contain"
-        />
-       
-    
+  return (
+    <View
+      className="flex-1 bg-[#A4E4DD] pt-10 px-5 items-center"
+      style={{ paddingTop: insets.top + 20 }}
+    >
+      {/* Header */}
+      <View className="flex-row items-center justify-between w-full max-w-[300px] mb-10">
+        <TouchableOpacity onPress={() => navigateDay('prev')} className="p-2">
+          <Ionicons name="chevron-back" size={24} color="teal" />
+        </TouchableOpacity>
+        <Text className="text-2xl font-semibold text-black">Today</Text>
+        <TouchableOpacity onPress={() => navigateDay('next')} className="p-2">
+          <Ionicons name="chevron-forward" size={24} color="teal" />
+        </TouchableOpacity>
       </View>
-      <View className="px-4 mb-2">
-        <Text className="text-[#0cb6ab] font-serif text-xl text-center mb-6 font-semibold mb-2">Health Trackers</Text>
-        <View className="bg-white rounded-lg divide-y divide-gray-700">
-          {featureList.map((feature) => (
-            <TouchableOpacity
-              key={feature.key}
-              className="flex-row items-center justify-between px-4 py-4"
-              onPress={() => {
-                if (trackerTabs.includes(feature.key)) {
-                  setActiveTab(feature.key as any);
-                  setSelectedFeature(feature.key);
-                } else {
-                  Alert.alert('Coming Soon', `${feature.label} tracker coming soon!`);
-                }
-              }}
-            >
-              <View className="flex-row items-center space-x-3">
-                {feature.icon}
-                <Text className="text-black text-base ml-6">{feature.label}</Text>
-              </View>
-              <Ionicons name="add" size={22} color="#0cb6ab" />
-            </TouchableOpacity>
-          ))}
+      {/* Progress Circle */}
+      <ProgressCircle />
+      {/* Stats Grid */}
+      <View className="flex-row flex-wrap justify-around w-full max-w-[300px] mt-10 mb-10">
+        <View className="items-center w-[45%] mb-5">
+          <FontAwesome name="map-marker" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+          <Text className="text-2xl font-bold text-black">{currentData.miles}</Text>
+          <Text className="text-xs text-[#14b8a6]">MILES</Text>
+        </View>
+        <View className="items-center w-[45%] mb-5">
+          <FontAwesome name="fire" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+          <Text className="text-2xl font-bold text-black">{currentData.calories}</Text>
+          <Text className="text-xs text-[#14b8a6]">KCAL</Text>
+        </View>
+        <View className="items-center w-[45%]">
+          <MaterialIcons name="timer" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+          <Text className="text-2xl font-bold text-black">{currentData.minutes}</Text>
+          <Text className="text-xs text-[#14b8a6]">MIN</Text>
+        </View>
+        <View className="items-center w-[45%]">
+          <MaterialIcons name="stairs" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+          <Text className="text-2xl font-bold text-black">{currentData.floors}</Text>
+          <Text className="text-xs text-[#14b8a6]">FLOORS</Text>
         </View>
       </View>
-    </ScrollView>
-  );
-
-  return (
-    <SafeAreaView className="flex-1 bg-gray-900">
-      <StatusBar barStyle="light-content" backgroundColor="" />
-      {selectedFeature && trackerTabs.includes(selectedFeature) ? (
-        <>
-          {/* Back Button */}
-          <View className="flex-row items-center px-4 py-3 bg-gray-900 border-b border-gray-800">
-            <TouchableOpacity onPress={() => setSelectedFeature(null)} className="mr-3">
-              <Ionicons name="arrow-back" size={24} color="#0cb6ab" />
-            </TouchableOpacity>
-            <Text className="text-white text-lg font-semibold capitalize">
-              {featureList.find(f => f.key === selectedFeature)?.label || 'Tracker'}
-            </Text>
-          </View>
-          {/* Tracker UI */}
-          <View className="flex-1">
-            {renderTabContent()}
-          </View>
-          {/* Bottom Navigation and Modal (unchanged) */}
-          <View className="flex-row bg-gray-800 border-t border-gray-700">
-            <TouchableOpacity className="flex-1 py-3 items-center">
-              <Ionicons name="bar-chart" size={20} color="#6B7280" />
-              <Text className="text-gray-400 text-xs mt-1">Graph</Text>
-            </TouchableOpacity>
-            <TouchableOpacity className="flex-1 py-3 items-center">
-              <Ionicons name="time" size={20} color="#6B7280" />
-              <Text className="text-gray-400 text-xs mt-1">History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              className="flex-1 py-3 items-center"
-              onPress={handleAddNew}
-            >
-              <Ionicons name="add-circle" size={20} color="#0cb6ab" />
-              <Text className="text-teal-400 text-xs mt-1">Add New</Text>
-            </TouchableOpacity>
-          </View>
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={modalVisible}
-            onRequestClose={() => setModalVisible(false)}
-          >
-            <View className="flex-1 justify-end bg-black/50">
-              <View className="bg-gray-900 rounded-t-xl p-6 max-h-4/5">
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  {renderModalContent()}
-                  <View className="flex-row space-x-3 mt-6">
-                    <TouchableOpacity
-                      className="flex-1 bg-gray-700 py-3 rounded-lg"
-                      onPress={() => setModalVisible(false)}
-                    >
-                      <Text className="text-white text-center font-medium">Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      className="flex-1 bg-teal-600 py-3 rounded-lg"
-                      onPress={handleSave}
-                    >
-                      <Text className="text-white text-center font-medium">Save</Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
-        </>
-      ) : (
-        renderLanding()
-      )}
-    </SafeAreaView>
+      {/* Weekly Progress */}
+      <View className="flex-row justify-center items-center mb-8">
+        {dayNames.map((day, index) => (
+          <DayCircle key={day} dayIndex={index} dayName={day} />
+        ))}
+      </View>
+      {/* Progress Bar */}
+      <View className="items-center w-full max-w-[300px]">
+        <Text className="text-xs text-gray-400 mb-2">
+          {progressPercentage.toFixed(1)}% of daily goal
+        </Text>
+        <View className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+          <LinearGradient
+            colors={['#14b8a6', '#0cb6ab', '#0891b2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ height: '100%', width: `${progressPercentage}%` }}
+          />
+        </View>
+      </View>
+    </View>
   );
 };
 
-export default Tracker;
+export default StepCounter;

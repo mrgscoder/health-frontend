@@ -54,6 +54,16 @@ const WelcomeScreen = () => {
               I ALREADY HAVE AN ACCOUNT
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)')}
+            className="border border-white rounded-full py-4 mt-4"
+            activeOpacity={0.8}
+          >
+            <Text className="text-white text-md font-bold text-center">
+              GO TO MAIN TABS
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>

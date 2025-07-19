@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView, Dimensions, Image, Switch } from 'react-native';
 import * as Progress from 'react-native-progress';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -57,10 +57,14 @@ const Water = () => {
   const [todayDate, setTodayDate] = useState(new Date().toDateString());
   const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [userId, setUserId] = useState<number>(1); // Default user ID
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
 
   const waterGoal = weight * 35;
   const glasses = Math.ceil(waterGoal / 250);
   const progress = Math.min(waterDrank / waterGoal, 1);
+
+  // Using default user ID for now
 
   // Check if it's a new day and reset if needed
   useEffect(() => {
@@ -157,6 +161,124 @@ const Water = () => {
     checkAchievements();
   }, [waterDrank, waterGoal, currentAchievement]);
 
+  // Load reminder settings on component mount
+  useEffect(() => {
+    const loadReminderSettings = async () => {
+      try {
+        // First try to load from database
+        const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+        if (token) {
+          try {
+            // Get user's reminder preferences from database
+            const response = await fetch(`http://192.168.1.16:5001/api/auth/get-reminder-preferences`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.reminder_enabled !== undefined) {
+                setRemindersEnabled(data.reminder_enabled);
+                await AsyncStorage.setItem('remindersEnabled', JSON.stringify(data.reminder_enabled));
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Error loading reminder preferences from database:', error);
+          }
+        }
+        
+        // Fallback to local storage
+        const savedRemindersEnabled = await AsyncStorage.getItem('remindersEnabled');
+        if (savedRemindersEnabled !== null) {
+          setRemindersEnabled(JSON.parse(savedRemindersEnabled));
+        }
+      } catch (error) {
+        console.error('Error loading reminder settings:', error);
+      }
+    };
+
+    loadReminderSettings();
+  }, []);
+
+  // Save reminder settings when changed
+  const handleReminderToggle = async (value: boolean) => {
+    setRemindersEnabled(value);
+    try {
+      await AsyncStorage.setItem('remindersEnabled', JSON.stringify(value));
+      
+      // Call API to update reminder preferences in database
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (token) {
+        const response = await fetch('http://192.168.1.16:5001/api/auth/update-reminder-preferences', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            reminder_enabled: value
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to update reminder preferences:', response.status, errorText);
+        } else {
+          console.log('Reminder preferences updated successfully');
+        }
+      } else {
+        console.error('No token available for updating reminder preferences');
+      }
+    } catch (error) {
+      console.error('Error saving reminder settings:', error);
+    }
+  };
+
+  // Call reminders API every 2 minutes when reminders are enabled
+  useEffect(() => {
+    let intervalId: number | null = null;
+    
+    if (remindersEnabled) {
+      // Call immediately when enabled
+      const callRemindersAPI = async () => {
+        try {
+          const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+          if (token) {
+            const response = await fetch('http://192.168.1.16:5001/api/auth/send-reminders', {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+            
+            if (!response.ok) {
+              console.error('Failed to call reminders API:', response.status);
+            } else {
+              console.log('Reminders API called successfully');
+            }
+          }
+        } catch (error) {
+          console.error('Error calling reminders API:', error);
+        }
+      };
+
+      // Call immediately
+      callRemindersAPI();
+      
+      // Set up interval for every 2 minutes (120000 ms)
+      intervalId = setInterval(callRemindersAPI, 120000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [remindersEnabled]);
+
   const handleAddWater = async (amount: number) => {
     const newAmount = Math.min(waterDrank + amount, waterGoal * 1.5); // Allow 150% of goal
     setWaterDrank(newAmount);
@@ -165,6 +287,41 @@ const Water = () => {
     // Save to storage
     await AsyncStorage.setItem('waterIntake', newAmount.toString());
     await AsyncStorage.setItem('weight', weight.toString());
+    
+    // Call API to record water intake
+    try {
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (token) {
+        const response = await fetch('http://192.168.1.16:5001/api/auth/record-water', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            user_id: userId, // Using default user ID
+            total_intake: newAmount,
+            intake_logs: [{
+              amount: amount,
+              timestamp: new Date().toISOString(),
+              totalIntake: newAmount
+            }]
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to record water intake:', response.status, errorText);
+        } else {
+          console.log('Water intake recorded successfully');
+        }
+      } else {
+        console.error('No token available');
+      }
+    } catch (error) {
+      console.error('Error recording water intake:', error);
+      // Continue with local storage even if API fails
+    }
     
     // Show quick feedback
     if (newAmount >= waterGoal && waterDrank < waterGoal) {
@@ -181,11 +338,11 @@ const Water = () => {
   };
 
   const getHydrationStatus = (): { icon: keyof typeof MaterialCommunityIcons.glyphMap; status: string; color: string } => {
-    if (progress >= 1) return { icon: 'trophy', status: 'Excellent!', color: '#0cb6ab' };
-    if (progress >= 0.75) return { icon: 'fire', status: 'Great!', color: '#0cb6ab' };
-    if (progress >= 0.5) return { icon: 'arm-flex', status: 'Good!', color: '#0cb6ab' };
-    if (progress >= 0.25) return { icon: 'leaf', status: 'Getting there!', color: '#0cb6ab' };
-    return { icon: 'sleep', status: 'Need water!', color: '#0cb6ab' };
+    if (progress >= 1) return { icon: 'trophy', status: 'Excellent!', color: '#f1ca00' };
+    if (progress >= 0.75) return { icon: 'fire', status: 'Great!', color: '#00b8f1' };
+    if (progress >= 0.5) return { icon: 'arm-flex', status: 'Good!', color: '#00b8f1' };
+    if (progress >= 0.25) return { icon: 'leaf', status: 'Getting there!', color: '#00b8f1' };
+    return { icon: 'sleep', status: 'Need water!', color: '#00b8f1' };
   };
 
   const getTimeUntilNextReminder = () => {
@@ -206,11 +363,17 @@ const Water = () => {
   const hydrationStatus = getHydrationStatus();
 
   return (
-    <ScrollView className="flex-1 bg-white">
-      <View className="p-4">
+    <View className="flex-1" style={{ backgroundColor: '#dffd6e' }}>
+      <Image 
+        source={require('../../assets/images/wa.png')} 
+        className="absolute w-full h-full"
+        resizeMode="cover"
+      />
+      <ScrollView className="flex-1">
+        <View className="p-4">
         {/* Header with streak */}
         <View className="items-center mt-8">
-          <Text className="text-3xl font-serif text-center font-bold text-black mb-2 mt-1">
+          <Text className="text-3xl text-bold  text-center  text-black mb-2 mt-3">
              AquaTracker
           </Text>
           {streak > 0 && (
@@ -249,34 +412,34 @@ const Water = () => {
         )}
   
         {/* Current Status */}
-        <View className="bg-white rounded-3xl p-4 mt-4 shadow-sm">
-          <View className="flex-row items-center justify-center mb-4">
-            <MaterialCommunityIcons name={hydrationStatus.icon} size={32} color={hydrationStatus.color} style={{ marginRight: 8 }} />
-            <Text className="text-xl font-semibold" style={{ color: hydrationStatus.color }}>
+        <View className="bg-white rounded-3xl p-3 mt-3 shadow-sm">
+          <View className="flex-row items-center justify-center mb-2">
+            <MaterialCommunityIcons name={hydrationStatus.icon} size={28} color={hydrationStatus.color} style={{ marginRight: 8 }} />
+            <Text className="text-lg font-semibold" style={{ color: hydrationStatus.color }}>
               {hydrationStatus.status}
             </Text>
           </View>
           
           <View className="items-center">
-            <Text className="text-lg font-semibold text-gray-700 mb-2">
+            <Text className="text-base font-semibold text-gray-700 mb-1">
               Progress: {waterDrank} ml / {waterGoal} ml
             </Text>
             <Progress.Bar
               progress={progress}
               width={width - 80}
-              height={25}
+              height={20}
               color={hydrationStatus.color}
               unfilledColor="#e5e7eb"
               borderWidth={0}
-              borderRadius={12}
+              borderRadius={10}
             />
-            <Text className="text-sm text-gray-600 mt-2">
+            <Text className="text-xs text-gray-600 mt-1">
               {Math.floor(waterDrank / 250)} of {glasses} glasses ({Math.round(progress * 100)}%)
             </Text>
-             <Text className="text-md text-gray-700 mt-6 text-center">
-             Daily Goal: <Text className="font-semibold text-[#0cb6ab]">{waterGoal} ml</Text>
+             <Text className="text-sm text-gray-700 mt-3 text-center">
+             Daily Goal: <Text className="font-semibold text-[#00b8f1]">{waterGoal} ml</Text>
           </Text>
-          <Text className="text-base text-xs text-black text-center mt-1">
+          <Text className="text-xs text-black text-center mt-1">
             That's about {glasses} glasses of water
           </Text>
           </View>
@@ -292,11 +455,11 @@ const Water = () => {
               <TouchableOpacity
                 key={cup.size}
                 onPress={() => handleAddWater(cup.size)}
-                className=" border-2 border-[#0cb6ab] rounded-xl p-3 m-1 items-center"
+                className=" border-2 border-[#00b8f1] rounded-xl p-3 m-1 items-center"
                 style={{ width: (width - 80) / 3 - 8 }}
               >
-                <MaterialCommunityIcons name={cup.icon} size={28} color="#0cb6ab" style={{ marginBottom: 4 }} />
-                <Text className="text-xs font-semibold text-[#0cb6ab]">{cup.size}ml</Text>
+                <MaterialCommunityIcons name={cup.icon} size={28} color="#00b8f1" style={{ marginBottom: 4 }} />
+                <Text className="text-xs font-semibold text-[#00b8f1]">{cup.size}ml</Text>
            
               </TouchableOpacity>
             ))}
@@ -304,19 +467,40 @@ const Water = () => {
        
 
         {/* Smart Reminders */}
-        
-          <Text className="text-lg  text-white mt-6 mb-2 text-center">
-             Smart Reminders
+        <View className="bg-white rounded-3xl p-4 mt-4 shadow-sm">
+          <Text className="text-xl text-gray-700 font-semibold text-center mb-3">
+            Smart Reminders
           </Text>
-          <Text className="text-base text-gray-600 text-center">
-            {getTimeUntilNextReminder()}
-          </Text>
-          {lastDrinkTime && (
-            <Text className="text-sm text-gray-500 text-center mt-2">
-              Last drink: {lastDrinkTime.toLocaleTimeString()}
+          
+          <View className="flex-row items-center justify-center mb-3">
+            <Text className="text-sm text-gray-600 mr-2">
+              {remindersEnabled ? 'On' : 'Off'}
+            </Text>
+            <Switch
+              value={remindersEnabled}
+              onValueChange={handleReminderToggle}
+              trackColor={{ false: '#e5e7eb', true: '#00b8f1' }}
+              thumbColor={remindersEnabled ? '#ffffff' : '#f3f4f6'}
+            />
+          </View>
+          
+          {remindersEnabled ? (
+            <>
+              <Text className="text-base text-gray-600 text-center">
+                {getTimeUntilNextReminder()}
+              </Text>
+              {lastDrinkTime && (
+                <Text className="text-sm text-gray-500 text-center mt-2">
+                  Last drink: {lastDrinkTime.toLocaleTimeString()}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text className="text-base text-gray-500 text-center italic">
+              Reminders are currently disabled
             </Text>
           )}
-     
+        </View>
 
         {/* Quick Stats */}
         
@@ -325,21 +509,21 @@ const Water = () => {
           </Text>
           <View className="flex-row justify-around">
             <View className="items-center">
-              <MaterialCommunityIcons name="cup" size={29} color="#FFFF" />
+              <MaterialCommunityIcons name="cup" size={29} color="#3B82F6" />
               <Text className="text-lg font-semibold text-black">
                 {Math.floor(waterDrank / 250)}
               </Text>
               <Text className="text-sm text-gray-600">Glasses</Text>
             </View>
             <View className="items-center">
-              <MaterialCommunityIcons name="target" size={29} color="#FFFF" />
+              <MaterialCommunityIcons name="target" size={29} color="#10B981" />
               <Text className="text-lg font-semibold text-black">
                 {Math.round(progress * 100)}%
               </Text>
               <Text className="text-sm text-gray-600">Complete</Text>
             </View>
             <View className="items-center">
-              <MaterialCommunityIcons name="fire" size={29} color="#FFFF" />
+              <MaterialCommunityIcons name="fire" size={29} color="#F59E0B" />
               <Text className="text-lg font-semibold text-black">
                 {streak}
               </Text>
@@ -358,8 +542,41 @@ const Water = () => {
           <Text className="text-base font-semibold text-red-700">Restart Day</Text>
         </TouchableOpacity>
 
-      </View>
-    </ScrollView>
+        {/* Send Reminder Button */}
+        <TouchableOpacity
+          onPress={async () => {
+            try {
+              const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+              if (token) {
+                const response = await fetch('http://192.168.1.16:5001/api/auth/send-reminders', {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                  },
+                });
+                if (response.ok) {
+                  Alert.alert('Success', 'Reminder sent successfully!');
+                } else {
+                  const errorText = await response.text();
+                  Alert.alert('Error', `Failed to send reminder: ${response.status} ${errorText}`);
+                }
+              } else {
+                Alert.alert('Error', 'No token available to send reminder.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'An error occurred while sending reminder.');
+            }
+          }}
+          className="flex-row items-center justify-center bg-blue-100 border-2 border-blue-300 rounded-xl p-3 mb-8"
+          style={{ alignSelf: 'center', width: width - 80 }}
+        >
+          <MaterialCommunityIcons name="bell" size={22} color="#2563eb" style={{ marginRight: 8 }} />
+          <Text className="text-base font-semibold text-blue-700">Send Reminder Now</Text>
+        </TouchableOpacity>
+
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 

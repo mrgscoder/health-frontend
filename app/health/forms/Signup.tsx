@@ -4,18 +4,21 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import axios from 'axios';
 
 // TypeScript types for form data and errors
 interface FormData {
   fullName: string;
   email: string;
   gender: 'Male' | 'Female' | 'Other' | '';
+  password: string;
   verificationCode: string;
 }
 interface FormErrors {
   fullName?: string;
   email?: string;
   gender?: string;
+  password?: string;
   verificationCode?: string;
 }
 
@@ -25,6 +28,7 @@ const SignUpPage = () => {
     fullName: '',
     email: '',
     gender: '',
+    password: '',
     verificationCode: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -59,12 +63,22 @@ const SignUpPage = () => {
 
     setIsSendingOtp(true);
     try {
-      // Simulate API call to send OTP
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setOtpSent(true);
-      setErrors(prev => ({ ...prev, email: '' }));
-    } catch (error) {
-      alert('Failed to send OTP. Please try again.');
+      const response = await axios.post('http://192.168.1.16:5001/api/auth/send-otp', {
+        email: formData.email,
+      });
+      if (response.data && response.data.message) {
+        setOtpSent(true);
+        setErrors(prev => ({ ...prev, email: '' }));
+      } else if (response.data && response.data.error) {
+        setErrors(prev => ({ ...prev, email: response.data.error }));
+      } else {
+        setErrors(prev => ({ ...prev, email: 'Failed to send OTP' }));
+      }
+    } catch (error: any) {
+      setErrors(prev => ({
+        ...prev,
+        email: error?.response?.data?.error || 'Failed to send OTP. Please try again.',
+      }));
     } finally {
       setIsSendingOtp(false);
     }
@@ -75,19 +89,26 @@ const SignUpPage = () => {
       setErrors(prev => ({ ...prev, verificationCode: 'Verification code is required' }));
       return;
     }
-
     setIsVerifyingCode(true);
     try {
-      // Simulate API call to verify OTP
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      if (formData.verificationCode === '123456') {
+      // Call backend API to verify OTP
+      const response = await axios.post('http://192.168.1.16:5001/api/auth/verify-otp', {
+        email: formData.email,
+        otp: formData.verificationCode,
+      });
+      if (response.data && response.data.message) {
         setCodeVerified(true);
         setErrors(prev => ({ ...prev, verificationCode: '' }));
+      } else if (response.data && response.data.error) {
+        setErrors(prev => ({ ...prev, verificationCode: response.data.error }));
       } else {
-        setErrors(prev => ({ ...prev, verificationCode: 'Invalid verification code' }));
+        setErrors(prev => ({ ...prev, verificationCode: 'Failed to verify code' }));
       }
-    } catch (error) {
-      alert('Failed to verify code. Please try again.');
+    } catch (error: any) {
+      setErrors(prev => ({
+        ...prev,
+        verificationCode: error?.response?.data?.error || 'Failed to verify code. Please try again.',
+      }));
     } finally {
       setIsVerifyingCode(false);
     }
@@ -99,6 +120,8 @@ const SignUpPage = () => {
     else if (formData.fullName.trim().length < 2) newErrors.fullName = 'Name must be at least 2 characters';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Please enter a valid email address';
+    if (!formData.password.trim()) newErrors.password = 'Password is required';
+    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
     if (!otpSent) newErrors.email = 'Please send OTP first';
     if (!codeVerified) newErrors.verificationCode = 'Please verify your code first';
     setErrors(newErrors);
@@ -109,13 +132,33 @@ const SignUpPage = () => {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      // Save user's full name and gender to AsyncStorage
-      await AsyncStorage.setItem('userFullName', formData.fullName);
-      await AsyncStorage.setItem('userGender', formData.gender);
-      router.push('/(tabs)/food');
-    } catch (error) {
-      alert('Error: Something went wrong. Please try again.');
+      // Call the register API
+      const response = await axios.post('http://192.168.1.16:5001/api/auth/register', {
+        name: formData.fullName,
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (response.status === 201) {
+        // Save user's full name and gender to AsyncStorage
+        await AsyncStorage.setItem('userFullName', formData.fullName);
+        await AsyncStorage.setItem('userGender', formData.gender);
+        
+        // If the API returns a token, save it
+        if (response.data.token) {
+          await AsyncStorage.setItem('userToken', response.data.token);
+        }
+        
+        // Navigate to the main app
+        router.push('/(tabs)');
+      } else {
+        alert('Registration failed: ' + (response.data?.message || 'Unknown error'));
+      }
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || 
+                         error?.response?.data?.error || 
+                         'Registration failed. Please try again.';
+      alert('Error: ' + errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -253,6 +296,21 @@ const SignUpPage = () => {
             </View>
             {errors.gender ? <Text className="text-red-500 text-sm font-medium mb-2 ml-2 self-start">{errors.gender}</Text> : null}
           </View>
+
+          {/* Password */}
+          <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'password' ? 'border-cyan-500' : 'border-gray-200'}`}>
+            <MaterialIcons name="lock" size={20} color="#6b7280" className="mr-3" />
+            <TextInput
+              className="flex-1 text-base text-gray-700 font-medium"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChangeText={text => handleInputChange('password', text)}
+              secureTextEntry={true}
+              onFocus={() => setFocusedField('password')}
+              onBlur={() => setFocusedField(null)}
+            />
+          </View>
+          {errors.password ? <Text className="text-red-500 text-sm font-medium mb-2 ml-2 self-start">{errors.password}</Text> : null}
 
           {/* Create Account Button */}
           <TouchableOpacity 

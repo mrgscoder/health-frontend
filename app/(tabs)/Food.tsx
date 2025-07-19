@@ -380,7 +380,7 @@ const Food = () => {
         {/* Header */}
         <View className="bg-white px-4 py-6 shadow-sm">
           <View className="items-center">
-            <Text className="text-black text-3xl font-serif font-bold mb-2 mt-8">Your Food Diary</Text>
+            <Text className="text-black text-3xl  font-bold mb-2 mt-8">Your Food Diary</Text>
             <Text className="text-gray-500 text-sm italic mb-4">Track your nutrition, fuel your wellness journey</Text>
             <View className="w-16 h-0.5 bg-[#0cb6ab] mb-4"></View>
             <View className="flex-row items-center space-x-3">
