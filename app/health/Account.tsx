@@ -1,15 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StatusBar, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StatusBar, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 const Account = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignIn = () => {
-    router.push('/health/forgot');
+  const handleSignIn = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await axios.post('http://192.168.1.16:5001/api/auth/login', {
+        email: email.trim(),
+        password: password,
+        role: 'user' // Default role
+      });
+
+      if (response.data && response.data.token) {
+        // Save token in both keys for consistency
+        await AsyncStorage.setItem('token', response.data.token);
+        await AsyncStorage.setItem('userToken', response.data.token);
+        
+        // Save user info
+        if (response.data.user) {
+          await AsyncStorage.setItem('userFullName', response.data.user.name);
+          await AsyncStorage.setItem('userEmail', response.data.user.email);
+        }
+        
+        Alert.alert('Success', 'Login successful!', [
+          {
+            text: 'OK',
+            onPress: () => router.push('/(tabs)')
+          }
+        ]);
+      } else {
+        Alert.alert('Error', 'Login failed. Please try again.');
+      }
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error || 'Login failed. Please check your credentials and try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -36,6 +77,7 @@ const Account = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!isLoading}
           />
         </View>
 
@@ -49,10 +91,12 @@ const Account = () => {
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
             autoCapitalize="none"
+            editable={!isLoading}
           />
           <TouchableOpacity
             className="absolute right-4 top-3"
             onPress={() => setShowPassword(!showPassword)}
+            disabled={isLoading}
           >
             <Ionicons
               name={showPassword ? 'eye-off' : 'eye'}
@@ -64,7 +108,7 @@ const Account = () => {
 
         {/* Forgot Password */}
         <View className="items-end mb-6">
-          <TouchableOpacity onPress={() => router.push('/health/forgot')}>
+          <TouchableOpacity onPress={() => router.push('/health/forgot')} disabled={isLoading}>
             <Text className="text-blue-400 text-sm">Forgot Password?</Text>
           </TouchableOpacity>
         </View>
@@ -84,10 +128,13 @@ const Account = () => {
         {/* Sign In Button */}
         <View className="items-center">
           <TouchableOpacity 
-            className="w-full py-3 mb-8 bg-[#0cb6ab] rounded-3xl"
+            className={`w-full py-3 mb-8 rounded-3xl ${isLoading ? 'bg-gray-400' : 'bg-[#0cb6ab]'}`}
             onPress={handleSignIn}
+            disabled={isLoading}
           >
-            <Text className="text-white text-center font-medium">SIGN IN</Text>
+            <Text className="text-white text-center font-medium">
+              {isLoading ? 'SIGNING IN...' : 'SIGN IN'}
+            </Text>
           </TouchableOpacity>
         </View>
 

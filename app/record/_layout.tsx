@@ -11,6 +11,18 @@ const _layout = () => {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="bloodpressuretracker"
+        options={{
+          title: 'Blood Pressure Tracker',
+          headerShown: false,
+        }}
+        />
+        <Stack.Screen
+      name="heartratetracker"
+      options={{
+        headerShown: false,
+      }}/>
     
     </Stack>
   );

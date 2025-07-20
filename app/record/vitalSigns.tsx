@@ -1,10 +1,70 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, TextInput, Alert, KeyboardTypeOptions } from 'react-native';
 import { Heart, Thermometer, Activity, Wind, Droplets, Plus, TrendingUp, Calendar, Clock, User } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+
+// Type definitions
+interface VitalSignsData {
+  bloodPressure: any[];
+  heartRate: any[];
+  temperature: any[];
+  respiratoryRate: any[];
+  bloodOxygen: any[];
+}
+
+interface HeartRateForm {
+  rate: string;
+  notes: string;
+}
+
+interface TemperatureForm {
+  temperature: string;
+  unit: 'F' | 'C';
+  notes: string;
+}
+
+interface RespiratoryRateForm {
+  rate: string;
+  notes: string;
+}
+
+interface BloodOxygenForm {
+  level: string;
+  notes: string;
+}
+
+interface VitalCardProps {
+  title: string;
+  icon: any;
+  color: string;
+  iconColor: string;
+  value: string | null;
+  unit: string;
+  onPress: () => void;
+  trend?: any;
+}
+
+interface FormInputProps {
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  keyboardType?: KeyboardTypeOptions;
+}
+
+interface SubmitButtonProps {
+  onPress: () => void;
+  title: string;
+}
+
+interface RecordItemProps {
+  item: any;
+  type: string;
+}
 
 const VitalSignsApp = () => {
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [vitalSigns, setVitalSigns] = useState({
+  const [vitalSigns, setVitalSigns] = useState<VitalSignsData>({
     bloodPressure: [],
     heartRate: [],
     temperature: [],
@@ -13,11 +73,10 @@ const VitalSignsApp = () => {
   });
 
   // Form states
-  const [bpForm, setBpForm] = useState({ systolic: '', diastolic: '', notes: '' });
-  const [hrForm, setHrForm] = useState({ rate: '', notes: '' });
-  const [tempForm, setTempForm] = useState({ temperature: '', unit: 'F', notes: '' });
-  const [rrForm, setRrForm] = useState({ rate: '', notes: '' });
-  const [o2Form, setO2Form] = useState({ level: '', notes: '' });
+  const [hrForm, setHrForm] = useState<HeartRateForm>({ rate: '', notes: '' });
+  const [tempForm, setTempForm] = useState<TemperatureForm>({ temperature: '', unit: 'F', notes: '' });
+  const [rrForm, setRrForm] = useState<RespiratoryRateForm>({ rate: '', notes: '' });
+  const [o2Form, setO2Form] = useState<BloodOxygenForm>({ level: '', notes: '' });
 
   const getCurrentDateTime = () => {
     const now = new Date();
@@ -27,7 +86,7 @@ const VitalSignsApp = () => {
     };
   };
 
-  const addVitalSign = (type, data) => {
+  const addVitalSign = (type: keyof VitalSignsData, data: any) => {
     const newEntry = {
       id: Date.now(),
       ...data,
@@ -41,9 +100,6 @@ const VitalSignsApp = () => {
     
     // Reset form
     switch(type) {
-      case 'bloodPressure':
-        setBpForm({ systolic: '', diastolic: '', notes: '' });
-        break;
       case 'heartRate':
         setHrForm({ rate: '', notes: '' });
         break;
@@ -61,7 +117,7 @@ const VitalSignsApp = () => {
     Alert.alert('Success', 'Vital sign recorded successfully!');
   };
 
-  const VitalCard = ({ title, icon: Icon, color, iconColor, value, unit, onPress, trend }) => (
+  const VitalCard = ({ title, icon: Icon, color, iconColor, value, unit, onPress, trend }: VitalCardProps) => (
     <TouchableOpacity 
       onPress={onPress}
       className={`bg-white rounded-2xl p-6 shadow-lg border-l-4 ${color} m-2 flex-1`}
@@ -79,7 +135,7 @@ const VitalSignsApp = () => {
     </TouchableOpacity>
   );
 
-  const FormInput = ({ placeholder, value, onChangeText, keyboardType = 'default' }) => (
+  const FormInput = ({ placeholder, value, onChangeText, keyboardType = 'default' }: FormInputProps) => (
     <TextInput
       className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 mb-3"
       placeholder={placeholder}
@@ -90,7 +146,7 @@ const VitalSignsApp = () => {
     />
   );
 
-  const SubmitButton = ({ onPress, title }) => (
+  const SubmitButton = ({ onPress, title }: SubmitButtonProps) => (
     <TouchableOpacity 
       onPress={onPress}
       className="bg-blue-600 rounded-xl py-4 items-center shadow-lg"
@@ -99,7 +155,7 @@ const VitalSignsApp = () => {
     </TouchableOpacity>
   );
 
-  const RecordItem = ({ item, type }) => (
+  const RecordItem = ({ item, type }: RecordItemProps) => (
     <View className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100">
       <View className="flex-row justify-between items-center mb-2">
         <Text className="text-gray-800 font-semibold text-lg">
@@ -149,7 +205,17 @@ const VitalSignsApp = () => {
             iconColor="#EF4444"
             value={vitalSigns.bloodPressure[0] ? `${vitalSigns.bloodPressure[0].systolic}/${vitalSigns.bloodPressure[0].diastolic}` : null}
             unit="mmHg"
-            onPress={() => setCurrentPage('bloodPressure')}
+            onPress={() => {
+              console.log('Blood Pressure card pressed');
+              console.log('Attempting to navigate to /record/bloodpressuretracker');
+              try {
+                console.log('Current route:', router.canGoBack());
+                router.push('./bloodpressuretracker');
+              } catch (error) {
+                console.error('Navigation error:', error);
+                Alert.alert('Navigation Error', 'Could not navigate to blood pressure tracker');
+              }
+            }}
           />
           <VitalCard
             title="Heart Rate"
@@ -158,7 +224,7 @@ const VitalSignsApp = () => {
             iconColor="#EC4899"
             value={vitalSigns.heartRate[0]?.rate}
             unit="bpm"
-            onPress={() => setCurrentPage('heartRate')}
+            onPress={() => router.push('./heartratetracker')}
           />
         </View>
         
@@ -211,94 +277,7 @@ const VitalSignsApp = () => {
     </ScrollView>
   );
 
-  const renderBloodPressureForm = () => (
-    <ScrollView className="flex-1 bg-gray-50 px-6 pt-6">
-      <View className="flex-row items-center mb-6">
-        <TouchableOpacity onPress={() => setCurrentPage('dashboard')} className="mr-4">
-          <Text className="text-blue-600 text-lg">← Back</Text>
-        </TouchableOpacity>
-        <Heart size={28} color="#EF4444" />
-        <Text className="text-2xl font-bold text-gray-800 ml-3">Blood Pressure</Text>
-      </View>
 
-      <View className="bg-white rounded-2xl p-6 shadow-lg mb-6">
-        <FormInput
-          placeholder="Systolic (top number)"
-          value={bpForm.systolic}
-          onChangeText={(text) => setBpForm(prev => ({ ...prev, systolic: text }))}
-          keyboardType="numeric"
-        />
-        <FormInput
-          placeholder="Diastolic (bottom number)"
-          value={bpForm.diastolic}
-          onChangeText={(text) => setBpForm(prev => ({ ...prev, diastolic: text }))}
-          keyboardType="numeric"
-        />
-        <FormInput
-          placeholder="Notes (optional)"
-          value={bpForm.notes}
-          onChangeText={(text) => setBpForm(prev => ({ ...prev, notes: text }))}
-        />
-        <SubmitButton
-          onPress={() => {
-            if (bpForm.systolic && bpForm.diastolic) {
-              addVitalSign('bloodPressure', bpForm);
-            } else {
-              Alert.alert('Error', 'Please enter both systolic and diastolic values');
-            }
-          }}
-          title="Record Blood Pressure"
-        />
-      </View>
-
-      {/* Previous Records */}
-      <Text className="text-lg font-bold text-gray-800 mb-3">Previous Records</Text>
-      {vitalSigns.bloodPressure.map((item) => (
-        <RecordItem key={item.id} item={item} type="bloodPressure" />
-      ))}
-    </ScrollView>
-  );
-
-  const renderHeartRateForm = () => (
-    <ScrollView className="flex-1 bg-gray-50 px-6 pt-6">
-      <View className="flex-row items-center mb-6">
-        <TouchableOpacity onPress={() => setCurrentPage('dashboard')} className="mr-4">
-          <Text className="text-blue-600 text-lg">← Back</Text>
-        </TouchableOpacity>
-        <Activity size={28} color="#EC4899" />
-        <Text className="text-2xl font-bold text-gray-800 ml-3">Heart Rate</Text>
-      </View>
-
-      <View className="bg-white rounded-2xl p-6 shadow-lg mb-6">
-        <FormInput
-          placeholder="Heart rate (bpm)"
-          value={hrForm.rate}
-          onChangeText={(text) => setHrForm(prev => ({ ...prev, rate: text }))}
-          keyboardType="numeric"
-        />
-        <FormInput
-          placeholder="Notes (optional)"
-          value={hrForm.notes}
-          onChangeText={(text) => setHrForm(prev => ({ ...prev, notes: text }))}
-        />
-        <SubmitButton
-          onPress={() => {
-            if (hrForm.rate) {
-              addVitalSign('heartRate', hrForm);
-            } else {
-              Alert.alert('Error', 'Please enter heart rate');
-            }
-          }}
-          title="Record Heart Rate"
-        />
-      </View>
-
-      <Text className="text-lg font-bold text-gray-800 mb-3">Previous Records</Text>
-      {vitalSigns.heartRate.map((item) => (
-        <RecordItem key={item.id} item={item} type="heartRate" />
-      ))}
-    </ScrollView>
-  );
 
   const renderTemperatureForm = () => (
     <ScrollView className="flex-1 bg-gray-50 px-6 pt-6">
@@ -448,8 +427,6 @@ const VitalSignsApp = () => {
   return (
     <View className="flex-1 bg-gray-50">
       {currentPage === 'dashboard' && renderDashboard()}
-      {currentPage === 'bloodPressure' && renderBloodPressureForm()}
-      {currentPage === 'heartRate' && renderHeartRateForm()}
       {currentPage === 'temperature' && renderTemperatureForm()}
       {currentPage === 'respiratoryRate' && renderRespiratoryRateForm()}
       {currentPage === 'bloodOxygen' && renderBloodOxygenForm()}

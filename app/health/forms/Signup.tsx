@@ -150,7 +150,7 @@ const SignUpPage = () => {
         }
         
         // Navigate to the main app
-        router.push('/(tabs)');
+        router.push('/health/Account');
       } else {
         alert('Registration failed: ' + (response.data?.message || 'Unknown error'));
       }
