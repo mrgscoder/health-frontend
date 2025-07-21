@@ -23,8 +23,45 @@ const _layout = () => {
       options={{
         headerShown: false,
       }}/>
+      <Stack.Screen
+        name="bloodoxygentracker"
+        options={{
+          title: 'Blood Oxygen Tracker',
+          headerShown: false,
+        }}/>
+        <Stack.Screen
+        name="sleeptracker"
+        options={{  
+          title: 'Sleep Tracker',
+          headerShown: false,
+        }}/>
+      <Stack.Screen
+        name="sleepLogger"
+        options={{
+          title: 'Sleep Logger',
+          headerShown: false,
+        }}/>  
+      <Stack.Screen
+        name="createhistory"
+        options={{
+          title: 'Create History',
+          headerShown: false,
+        }}/> 
+         <Stack.Screen
+        name="respiratoryRate"
+        options={{
+          title: 'Respiratory Rate',
+          headerShown: false,
+        }}/> 
+        <Stack.Screen
+        name="bodytemperaturetracker"
+        options={{
+          title: 'Body Temperature Tracker',
+          headerShown: false,
+        }}/>
     
     </Stack>
+   
   );
 };
 

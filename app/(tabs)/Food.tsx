@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, SafeAreaView, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, SafeAreaView, FlatList, Alert, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface FoodItem {
   name: string;
@@ -24,6 +25,8 @@ const Food = () => {
   const [showAddFoodModal, setShowAddFoodModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<keyof FoodData>('breakfast');
+  const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [newFood, setNewFood] = useState({
     name: '',
     calories: '',
@@ -35,16 +38,12 @@ const Food = () => {
   });
 
   // Store food data for each date
-  const [foodDataByDate, setFoodDataByDate] = useState<Record<string, FoodData>>({
-    [formatDateKey(new Date())]: {
-      breakfast: [
-        { name: 'White bread, 1 slice', calories: 75, carbs: 14, fat: 1, protein: 3, sodium: 134, sugar: 1 }
-      ],
-      lunch: [],
-      dinner: [],
-      snacks: []
-    }
-  });
+  const [foodDataByDate, setFoodDataByDate] = useState<Record<string, FoodData>>({});
+
+  // Fetch food data when component mounts and when selected date changes
+  useEffect(() => {
+    fetchFoodData(selectedDate);
+  }, [selectedDate]);
 
   const dailyGoals = {
     calories: 1870,
@@ -86,6 +85,84 @@ const Food = () => {
     }));
   }
 
+  const fetchFoodData = async (date: Date) => {
+    setIsLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (token) {
+        const dateKey = formatDateKey(date);
+        const response = await fetch(`http://192.168.1.16:5001/api/food/getfood?date=${dateKey}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const records = data.records || [];
+          
+          // Group records by meal type
+          const foodData: FoodData = {
+            breakfast: [],
+            lunch: [],
+            dinner: [],
+            snacks: []
+          };
+          
+          records.forEach((record: any) => {
+            const foodItem: FoodItem = {
+              name: record.name,
+              calories: record.calories,
+              carbs: record.carbs,
+              fat: record.fat,
+              protein: record.protein,
+              sodium: record.sodium,
+              sugar: record.sugar
+            };
+            
+            if (record.meal && foodData[record.meal as keyof FoodData]) {
+              foodData[record.meal as keyof FoodData].push(foodItem);
+            }
+          });
+          
+          // Update the food data for this date
+          setFoodDataByDate(prev => ({
+            ...prev,
+            [dateKey]: foodData
+          }));
+        } else {
+          console.error('Failed to fetch food data:', response.status);
+          // If no data found, initialize empty food data for this date
+          const dateKey = formatDateKey(date);
+          setFoodDataByDate(prev => ({
+            ...prev,
+            [dateKey]: {
+              breakfast: [],
+              lunch: [],
+              dinner: [],
+              snacks: []
+            }
+          }));
+        }
+      } else {
+        console.error('No token available');
+        Alert.alert('Error', 'Authentication required');
+      }
+    } catch (error) {
+      console.error('Error fetching food data:', error);
+      Alert.alert('Error', 'Failed to load food data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchFoodData(selectedDate);
+    setRefreshing(false);
+  };
+
   const calculateTotals = () => {
     let totals = { calories: 0, carbs: 0, fat: 0, protein: 0, sodium: 0, sugar: 0 };
     const currentFoodData = getCurrentFoodData();
@@ -114,9 +191,9 @@ const Food = () => {
     sugar: Math.max(0, dailyGoals.sugar - totals.sugar)
   };
 
-  const handleAddFood = () => {
+  const handleAddFood = async () => {
     if (!newFood.name || !newFood.calories) {
-      alert('Please enter food name and calories');
+      Alert.alert('Error', 'Please enter food name and calories');
       return;
     }
 
@@ -130,6 +207,7 @@ const Food = () => {
       sugar: parseInt(newFood.sugar) || 0
     };
 
+    // Add to local state first
     const currentFoodData = getCurrentFoodData();
     const updatedFoodData: FoodData = {
       ...currentFoodData,
@@ -137,6 +215,47 @@ const Food = () => {
     };
     
     updateFoodData(updatedFoodData);
+
+    // Call API to save to database
+    try {
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (token) {
+        const response = await fetch('http://192.168.1.16:5001/api/food/addfood', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            date: formatDateKey(selectedDate),
+            meal: selectedMeal,
+            name: foodItem.name,
+            calories: foodItem.calories,
+            carbs: foodItem.carbs,
+            fat: foodItem.fat,
+            protein: foodItem.protein,
+            sodium: foodItem.sodium,
+            sugar: foodItem.sugar
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Failed to add food:', response.status, errorText);
+          Alert.alert('Error', 'Failed to save food to database');
+        } else {
+          console.log('Food added successfully to database');
+          // Refresh the food data after adding
+          fetchFoodData(selectedDate);
+        }
+      } else {
+        console.error('No token available');
+        Alert.alert('Error', 'Authentication required');
+      }
+    } catch (error) {
+      console.error('Error adding food:', error);
+      Alert.alert('Error', 'Failed to connect to server');
+    }
 
     setNewFood({
       name: '',
@@ -168,6 +287,7 @@ const Food = () => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
     setSelectedDate(newDate);
+    // fetchFoodData will be called automatically via useEffect
   };
 
   const generateCalendarDays = () => {
@@ -271,6 +391,7 @@ const Food = () => {
                       onPress={() => {
                         setSelectedDate(day);
                         setShowCalendarModal(false);
+                        // fetchFoodData will be called automatically via useEffect
                       }}
                       className={`flex-1 items-center justify-center rounded-lg ${
                         day.toDateString() === selectedDate.toDateString()
@@ -376,7 +497,18 @@ const Food = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        className="flex-1" 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#0cb6ab']}
+            tintColor="#0cb6ab"
+          />
+        }
+      >
         {/* Header */}
         <View className="bg-white px-4 py-6 shadow-sm">
           <View className="items-center">
@@ -411,10 +543,18 @@ const Food = () => {
 
         {/* Meals */}
         <View className="px-4 mt-4">
-          <MealSection title="🍳 Breakfast" mealKey="breakfast" items={currentFoodData.breakfast} />
-          <MealSection title="🥗 Lunch" mealKey="lunch" items={currentFoodData.lunch} />
-          <MealSection title="🍽️ Dinner" mealKey="dinner" items={currentFoodData.dinner} />
-          <MealSection title="🍿 Snacks" mealKey="snacks" items={currentFoodData.snacks} />
+          {isLoading ? (
+            <View className="items-center py-8">
+              <Text className="text-gray-500 text-base">Loading food data...</Text>
+            </View>
+          ) : (
+            <>
+              <MealSection title="🍳 Breakfast" mealKey="breakfast" items={currentFoodData.breakfast} />
+              <MealSection title="🥗 Lunch" mealKey="lunch" items={currentFoodData.lunch} />
+              <MealSection title="🍽️ Dinner" mealKey="dinner" items={currentFoodData.dinner} />
+              <MealSection title="🍿 Snacks" mealKey="snacks" items={currentFoodData.snacks} />
+            </>
+          )}
         </View>
 
         {/* Summary */}
