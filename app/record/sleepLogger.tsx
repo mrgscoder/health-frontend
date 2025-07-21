@@ -14,7 +14,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://192.168.1.16:5001/api/auth'; // Updated API URL
+const API_BASE_URL = 'http://192.168.1.16:5001/api/sleep'; // Updated API URL
 
 export default function sleepLogger() {
   const [date, setDate] = useState(new Date());

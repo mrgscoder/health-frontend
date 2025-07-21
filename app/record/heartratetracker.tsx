@@ -13,16 +13,25 @@ import {
 import { LineChart } from 'react-native-chart-kit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://192.168.1.16:5001/api/auth'; // Updated API URL
+const API_BASE_URL = 'http://192.168.1.16:5001/api/heart'; // Updated API URL
 const USER_ID = 1; // Default user ID
+
+// Define the type for heart rate records
+interface HeartRateRecord {
+  id: number;
+  rate: number;
+  notes: string | null;
+  date_time: string;
+}
 
 const HeartRateTracker = () => {
   const [heartRate, setHeartRate] = useState('');
   const [notes, setNotes] = useState('');
-  const [records, setRecords] = useState([]);
+  const [records, setRecords] = useState<HeartRateRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [addingRecord, setAddingRecord] = useState(false);
+  
   useEffect(() => {
     fetchHeartRateRecords();
   }, []);
@@ -37,7 +46,7 @@ const HeartRateTracker = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/getheartrate`, {
+      const response = await fetch(`${API_BASE_URL}/gethr`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -85,7 +94,7 @@ const HeartRateTracker = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/addheartrate`, {
+      const response = await fetch(`${API_BASE_URL}/addhr`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,7 +115,7 @@ const HeartRateTracker = () => {
         setNotes('');
         
         // Add the new record to the frontend immediately
-        const newRecord = {
+        const newRecord: HeartRateRecord = {
           id: data.id || data.record?.id || Date.now(), // Try multiple possible ID locations
           rate: rateValue,
           notes: notes.trim() || null,
@@ -144,12 +153,12 @@ const HeartRateTracker = () => {
     fetchHeartRateRecords();
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
   };
 
-  const getHeartRateStatus = (rate) => {
+  const getHeartRateStatus = (rate: number) => {
     if (rate < 60) return { status: 'Low', color: 'text-blue-600', bg: 'bg-blue-100' };
     if (rate <= 100) return { status: 'Normal', color: 'text-green-600', bg: 'bg-green-100' };
     if (rate <= 150) return { status: 'Elevated', color: 'text-yellow-600', bg: 'bg-yellow-100' };

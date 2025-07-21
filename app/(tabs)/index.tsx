@@ -73,7 +73,7 @@ const HealthTrackerDashboard = () => {
       return;
     }
     if (itemId === 'steps') {
-      router.push('/(tabs)/tracker');
+      router.push('/record/stepCount');
       return;
     }
     if (itemId === 'sleep') {

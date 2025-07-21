@@ -238,11 +238,26 @@ const TemperatureTracker = () => {
   };
 
   // Prepare chart data (all converted to Celsius for consistency)
-  const chartData = records.slice(0, 10).reverse().map((record, index) => ({
-    name: `${index + 1}`,
-    temperature: record.unit === 'C' ? record.temperature : convertTemperature(record.temperature, 'F', 'C'),
-    date: new Date(record.timestamp).toLocaleDateString()
-  }));
+  const chartData = records.slice(0, 10).reverse().map((record, index) => {
+    const temp = record.unit === 'C' ? record.temperature : convertTemperature(record.temperature, 'F', 'C');
+    console.log(`Chart data record ${index}:`, { 
+      original: record.temperature, 
+      converted: temp, 
+      unit: record.unit,
+      isValid: temp != null && !isNaN(temp)
+    });
+    return {
+      name: `${index + 1}`,
+      temperature: temp,
+      date: new Date(record.timestamp).toLocaleDateString()
+    };
+  }).filter(item => {
+    const isValid = item.temperature != null && !isNaN(item.temperature);
+    if (!isValid) {
+      console.warn('Filtering out invalid temperature data:', item);
+    }
+    return isValid;
+  });
 
   const trends = calculateTrends();
   const latestReading = records[0];
@@ -338,38 +353,45 @@ const TemperatureTracker = () => {
         {records.length > 0 && (
           <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
             <Text className="text-lg font-semibold text-gray-800 mb-4">Temperature Trend (°C)</Text>
-            <LineChart
-              data={{
-                labels: chartData.map(d => d.date.split('/')[1] + '/' + d.date.split('/')[0]),
-                datasets: [
-                  {
-                    data: chartData.map(d => d.temperature),
-                    color: (opacity = 1) => `rgba(0, 184, 241, ${opacity})`, // #00b8f1
-                    strokeWidth: 3,
-                  }
-                ],
-                legend: ['Temperature (°C)'],
-              }}
-              width={Dimensions.get('window').width - 48}
-              height={220}
-              yAxisSuffix="°"
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 1,
-                color: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                style: { borderRadius: 16 },
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '2',
-                  stroke: '#fff',
-                },
-              }}
-              bezier
-              style={{ borderRadius: 16 }}
-            />
+            {chartData.filter(d => d.temperature != null && !isNaN(d.temperature)).length > 0 ? (
+              <LineChart
+                data={{
+                  labels: chartData.filter(d => d.temperature != null && !isNaN(d.temperature)).map(d => d.date.split('/')[1] + '/' + d.date.split('/')[0]),
+                  datasets: [
+                    {
+                      data: chartData.filter(d => d.temperature != null && !isNaN(d.temperature)).map(d => d.temperature),
+                      color: (opacity = 1) => `rgba(0, 184, 241, ${opacity})`, // #00b8f1
+                      strokeWidth: 3,
+                    }
+                  ],
+                  legend: ['Temperature (°C)'],
+                }}
+                width={Dimensions.get('window').width - 48}
+                height={220}
+                yAxisSuffix="°"
+                chartConfig={{
+                  backgroundColor: '#fff',
+                  backgroundGradientFrom: '#fff',
+                  backgroundGradientTo: '#fff',
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                  style: { borderRadius: 16 },
+                  propsForDots: {
+                    r: '4',
+                    strokeWidth: '2',
+                    stroke: '#fff',
+                  },
+                }}
+                bezier
+                style={{ borderRadius: 16 }}
+              />
+            ) : (
+              <View className="items-center py-8">
+                <Text className="text-gray-400">No valid temperature data available for chart</Text>
+                <Text className="text-gray-400 text-sm">Record some temperature readings to see trends</Text>
+              </View>
+            )}
             <View className="flex-row justify-center mt-2">
               <View className="flex-row items-center">
                 <View className="w-4 h-4 bg-[#00b8f1] rounded mr-2"></View>

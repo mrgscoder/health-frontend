@@ -59,6 +59,12 @@ const _layout = () => {
           title: 'Body Temperature Tracker',
           headerShown: false,
         }}/>
+        <Stack.Screen
+        name="stepCount"
+        options={{
+          title: 'Step Count',
+          headerShown: false,
+        }}/>
     
     </Stack>
    
