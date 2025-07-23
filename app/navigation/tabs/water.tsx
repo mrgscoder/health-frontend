@@ -57,7 +57,7 @@ const Water = () => {
   const [todayDate, setTodayDate] = useState(new Date().toDateString());
   const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [userId, setUserId] = useState<number>(1); // Default user ID
+  const [userId, setUserId] = useState<number | null>(null); // Will be set from token
   const [remindersEnabled, setRemindersEnabled] = useState(true);
 
   const waterGoal = weight * 35;
@@ -66,10 +66,72 @@ const Water = () => {
 
   // Using default user ID for now
 
+  // Clear old AsyncStorage data when user logs in for the first time
+  useEffect(() => {
+    const clearOldData = async () => {
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      const hasClearedData = await AsyncStorage.getItem('hasClearedWaterData');
+      
+      if (token && !hasClearedData) {
+        // User is logged in but we haven't cleared old data yet
+        console.log('Clearing old AsyncStorage water data for first-time login');
+        await AsyncStorage.removeItem('waterIntake');
+        await AsyncStorage.removeItem('lastActiveDate');
+        await AsyncStorage.removeItem('streak');
+        await AsyncStorage.setItem('hasClearedWaterData', 'true');
+      }
+    };
+
+    clearOldData();
+  }, []);
+
   // Check if it's a new day and reset if needed
   useEffect(() => {
     const checkNewDay = async () => {
       const today = new Date().toDateString();
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      
+      // If user is logged in, try to load data from database first
+      if (token) {
+        try {
+          const response = await fetch('http://192.168.1.16:5001/api/water/today', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Loaded water intake from database:', data);
+            
+            // Set water intake from database
+            setWaterDrank(data.total_intake || 0);
+            
+            // Clear old AsyncStorage data to prevent conflicts
+            await AsyncStorage.removeItem('waterIntake');
+            await AsyncStorage.removeItem('lastActiveDate');
+            
+            // Set today's date
+            setTodayDate(today);
+            await AsyncStorage.setItem('lastActiveDate', today);
+            
+            // Load weight from AsyncStorage or use default
+            const savedWeight = await AsyncStorage.getItem('weight');
+            if (savedWeight) {
+              setWeight(parseInt(savedWeight));
+            }
+            
+            return; // Exit early since we loaded from database
+          } else {
+            console.error('Failed to load water intake from database:', response.status);
+          }
+        } catch (error) {
+          console.error('Error loading water intake from database:', error);
+        }
+      }
+      
+      // Fallback to AsyncStorage logic for non-logged in users or when database fails
       const savedDate = await AsyncStorage.getItem('lastActiveDate');
       const savedWaterIntake = await AsyncStorage.getItem('waterIntake');
       const savedStreak = await AsyncStorage.getItem('streak');
@@ -169,8 +231,8 @@ const Water = () => {
         const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
         if (token) {
           try {
-            // Get user's reminder preferences from database
-            const response = await fetch(`http://192.168.1.16:5001/api/auth/get-reminder-preferences`, {
+                    // Get user's reminder preferences from database
+        const response = await fetch(`http://192.168.1.16:5001/api/water/get-reminder-preferences`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -212,7 +274,7 @@ const Water = () => {
       // Call API to update reminder preferences in database
       const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
       if (token) {
-        const response = await fetch('http://192.168.1.16:5001/api/auth/update-reminder-preferences', {
+        const response = await fetch('http://192.168.1.16:5001/api/water/update-reminder-preferences', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -247,7 +309,7 @@ const Water = () => {
         try {
           const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
           if (token) {
-            const response = await fetch('http://192.168.1.16:5001/api/auth/send-reminders', {
+            const response = await fetch('http://192.168.1.16:5001/api/water/send-reminders', {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -292,14 +354,13 @@ const Water = () => {
     try {
       const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
       if (token) {
-        const response = await fetch('http://192.168.1.16:5001/api/auth/record-water', {
+        const response = await fetch('http://192.168.1.16:5001/api/water/record-water', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            user_id: userId, // Using default user ID
             total_intake: newAmount,
             intake_logs: [{
               amount: amount,
@@ -335,6 +396,32 @@ const Water = () => {
     setLastDrinkTime(null);
     await AsyncStorage.setItem('waterIntake', '0');
     await AsyncStorage.removeItem('lastDrinkTime');
+    
+    // Also clear database data if user is logged in
+    try {
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (token) {
+        const response = await fetch('http://192.168.1.16:5001/api/water/record-water', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            total_intake: 0,
+            intake_logs: []
+          }),
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to reset water intake in database:', response.status);
+        } else {
+          console.log('Water intake reset in database successfully');
+        }
+      }
+    } catch (error) {
+      console.error('Error resetting water intake in database:', error);
+    }
   };
 
   const getHydrationStatus = (): { icon: keyof typeof MaterialCommunityIcons.glyphMap; status: string; color: string } => {
@@ -365,14 +452,14 @@ const Water = () => {
   return (
     <View className="flex-1" style={{ backgroundColor: '#dffd6e' }}>
       <Image 
-        source={require('../../assets/images/wa.png')} 
+        source={require('../../../assets/images/wa.png')} 
         className="absolute w-full h-full"
         resizeMode="cover"
       />
       <ScrollView className="flex-1">
         <View className="p-4">
         {/* Header with streak */}
-        <View className="items-center mt-8">
+        <View className="items-center mt-4">
           <Text className="text-3xl text-bold  text-center  text-black mb-2 mt-3">
              AquaTracker
           </Text>
@@ -548,7 +635,7 @@ const Water = () => {
             try {
               const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
               if (token) {
-                const response = await fetch('http://192.168.1.16:5001/api/auth/send-reminders', {
+                const response = await fetch('http://192.168.1.16:5001/api/water/send-reminders', {
                   method: 'GET',
                   headers: {
                     'Authorization': `Bearer ${token}`,

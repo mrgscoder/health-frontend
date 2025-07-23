@@ -3,6 +3,7 @@ import { View, Text, TextInput, ScrollView, TouchableOpacity, Image, SafeAreaVie
 // icon library from expo
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface InformData {
   name: string;
@@ -21,7 +22,7 @@ export default function Inform({ onNext }: InformProps) {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(false);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!name.trim() || !height.trim() || !weight.trim()) {
       setShowWarning(true);
       return;
@@ -34,8 +35,21 @@ export default function Inform({ onNext }: InformProps) {
       onNext(data);
     } else {
       // Default behavior when used as standalone page
-      // Navigate to the next step in the form flow
-      router.push('/health/forms/LifestyleForm');
+      // Store the name in AsyncStorage for later use
+      try {
+        await AsyncStorage.setItem('userFullName', name.trim());
+      } catch (error) {
+        console.log('Error storing name in AsyncStorage:', error);
+      }
+      // Navigate to the next step in the form flow with collected data
+      router.push({
+        pathname: '/health/forms/LifestyleForm',
+        params: {
+          name: name.trim(),
+          height: height.trim(),
+          weight: weight.trim()
+        }
+      });
     }
   };
 
@@ -52,12 +66,12 @@ export default function Inform({ onNext }: InformProps) {
         {/* Name Input */}
         <View className="mb-5">
           <View className="flex-row items-center mb-2">
-            <MaterialCommunityIcons name="account" size={18} color="#0cb6ab" />
-            <Text className="ml-2 text-base text-lg font-semibold text-[#0cb6ab]">Your Name</Text>
+            <MaterialCommunityIcons name="account" size={18} color="#11B5CF" />
+            <Text className="ml-2 text-base text-lg font-semibold text-[#11B5CF]">Your Name</Text>
           </View>
           <View
             className={`bg-white border rounded-xl px-4 py-3 ${
-              focusedField === 'name' ? 'border-[#0cb6ab] border-2' : 'border-gray-200'
+              focusedField === 'name' ? 'border-[#11B5CF] border-2' : 'border-gray-200'
             }`}
           >
             <TextInput
@@ -75,12 +89,12 @@ export default function Inform({ onNext }: InformProps) {
         {/* Height Input */}
         <View className="mb-5">
           <View className="flex-row items-center mb-2">
-            <MaterialCommunityIcons name="human-male-height" size={18} color="#0cb6ab" />
-            <Text className="ml-2 text-base text-lg font-semibold text-[#0cb6ab]">Height (cm)</Text>
+            <MaterialCommunityIcons name="human-male-height" size={18} color="#11B5CF" />
+            <Text className="ml-2 text-base text-lg font-semibold text-[#11B5CF]">Height (cm)</Text>
           </View>
           <View
             className={`bg-white border rounded-xl px-4 py-3 ${
-              focusedField === 'height' ? 'border-[#0cb6ab] border-2' : 'border-gray-200'
+              focusedField === 'height' ? 'border-[#11B5CF] border-2' : 'border-gray-200'
             }`}
           >
             <TextInput
@@ -100,12 +114,12 @@ export default function Inform({ onNext }: InformProps) {
         {/* Weight Input */}
         <View className="mb-5">
           <View className="flex-row items-center mb-2">
-            <MaterialCommunityIcons name="weight-kilogram" size={18} color="#0cb6ab" />
-            <Text className="ml-2 text-base text-lg font-semibold text-[#0cb6ab]">Weight (kg)</Text>
+            <MaterialCommunityIcons name="weight-kilogram" size={18} color="#11B5CF" />
+            <Text className="ml-2 text-base text-lg font-semibold text-[#11B5CF]">Weight (kg)</Text>
           </View>
           <View
             className={`bg-white border rounded-xl px-4 py-3 ${
-              focusedField === 'weight' ? 'border-[#0cb6ab] border-2' : 'border-gray-200'
+              focusedField === 'weight' ? 'border-[#11B5CF] border-2' : 'border-gray-200'
             }`}
           >
             <TextInput
@@ -139,7 +153,7 @@ export default function Inform({ onNext }: InformProps) {
         <View className="mt-6">
           <TouchableOpacity
             onPress={handleNext}
-            className="bg-[#0cb6ab] py-3 rounded-lg items-center"
+            className="bg-[#11B5CF] py-3 rounded-full items-center"
             activeOpacity={0.8}
           >
             <Text className="text-white font-semibold">NEXT</Text>

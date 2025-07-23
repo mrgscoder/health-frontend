@@ -8,11 +8,13 @@ import {
   Platform,
   Button,
   ScrollView,
-  ImageBackground,
   Alert
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { Bed, Sun, Save, Loader } from 'lucide-react-native';
 
 const API_BASE_URL = 'http://192.168.1.16:5001/api/sleep'; // Updated API URL
 
@@ -60,7 +62,7 @@ export default function sleepLogger() {
       console.log('Backend response:', data);
 
       if (response.ok) {
-        Alert.alert('Success', '🛏️ Sleep log saved successfully!');
+        Alert.alert('Success', 'Sleep log saved successfully!');
         
         // Also save to local storage for offline access
         const log = {
@@ -85,13 +87,15 @@ export default function sleepLogger() {
   };
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/night-bg.jpg')}
+    <LinearGradient
+      colors={['#0f0f23', '#1a1a2e', '#16213e', '#0f3460']}
       style={styles.bg}
-      resizeMode="cover"
     >
       <ScrollView style={styles.container}>
-        <Text style={styles.heading}>🛏️ Log Your Sleep</Text>
+        <View style={styles.headingContainer}>
+          <Bed size={28} color="#f1f5f9" />
+          <Text style={styles.heading}>Log Your Sleep</Text>
+        </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Have A Good Sleep</Text>
@@ -102,7 +106,10 @@ export default function sleepLogger() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>🌙 Bedtime:</Text>
+          <View style={styles.labelContainer}>
+            <Bed size={20} color="#e2e8f0" />
+            <Text style={styles.label}>Bedtime:</Text>
+          </View>
           <TouchableOpacity
             style={styles.timeButton}
             onPress={() => setShowBedPicker(true)}>
@@ -122,7 +129,10 @@ export default function sleepLogger() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>☀️ Wake Time:</Text>
+          <View style={styles.labelContainer}>
+            <Sun size={20} color="#e2e8f0" />
+            <Text style={styles.label}>Wake Time:</Text>
+          </View>
           <TouchableOpacity
             style={styles.timeButton}
             onPress={() => setShowWakePicker(true)}>
@@ -146,12 +156,22 @@ export default function sleepLogger() {
           onPress={handleLogSleep}
           disabled={loading}
         >
-          <Text style={styles.submitText}>
-            {loading ? '⏳ Saving...' : '💾 Save Sleep Log'}
-          </Text>
+          <View style={styles.submitContent}>
+            {loading ? (
+              <>
+                <Loader size={20} color="#0f172a" />
+                <Text style={styles.submitText}>Saving...</Text>
+              </>
+            ) : (
+              <>
+                <Save size={20} color="#0f172a" />
+                <Text style={styles.submitText}>Save Sleep Log</Text>
+              </>
+            )}
+          </View>
         </TouchableOpacity>
       </ScrollView>
-    </ImageBackground>
+    </LinearGradient>
   );
 }
 
@@ -161,23 +181,33 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
     padding: 20,
+  },
+  headingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 16,
+    gap: 8,
   },
   heading: {
     fontSize: 24,
     color: '#f1f5f9',
     fontWeight: 'bold',
     textAlign: 'center',
-    marginVertical: 16,
   },
   inputGroup: {
     marginBottom: 20,
   },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
   label: {
     color: '#e2e8f0',
     fontSize: 16,
-    marginBottom: 6,
   },
   timeButton: {
     backgroundColor: '#1e293b',
@@ -195,6 +225,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 10,
+  },
+  submitContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   submitText: {
     color: '#0f172a',

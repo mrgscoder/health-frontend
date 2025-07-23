@@ -7,7 +7,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { MaterialCommunityIcons, Feather, FontAwesome5 } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 interface LifestyleData {
   activityLevel: string;
@@ -25,27 +25,39 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
   const [selectedSleepHours, setSelectedSleepHours] = useState<string>('');
   const [selectedDietPreference, setSelectedDietPreference] = useState<string>('');
   const [showWarning, setShowWarning] = useState(false);
+  
+  // Get data from previous form
+  const params = useLocalSearchParams();
+  const previousData = {
+    name: params.name as string,
+    height: params.height as string,
+    weight: params.weight as string
+  };
+
+  // Debug: Log what data we're receiving
+  console.log('LifestyleForm.tsx - Received params:', params);
+  console.log('LifestyleForm.tsx - previousData:', previousData);
 
   const activityLevels = [
-    { id: 'Sedentary', label: 'SEDENTARY', icon: <MaterialCommunityIcons name="account" size={22} color="#0cb6ab" /> },
-    { id: 'Lightly Active', label: 'LIGHTLY ACTIVE', icon: <Feather name="activity" size={22} color="#0cb6ab" /> },
-    { id: 'Moderately Active', label: 'MODERATELY ACTIVE', icon: <MaterialCommunityIcons name="run" size={22} color="#0cb6ab" /> },
-    { id: 'Very Active', label: 'VERY ACTIVE', icon: <MaterialCommunityIcons name="weight-lifter" size={22} color="#0cb6ab" /> },
+    { id: 'Sedentary', label: 'SEDENTARY', icon: <MaterialCommunityIcons name="account" size={22} color="#11B5CF" /> },
+    { id: 'Lightly Active', label: 'LIGHTLY ACTIVE', icon: <Feather name="activity" size={22} color="#11B5CF" /> },
+    { id: 'Moderately Active', label: 'MODERATELY ACTIVE', icon: <MaterialCommunityIcons name="run" size={22} color="#11B5CF" /> },
+    { id: 'Very Active', label: 'VERY ACTIVE', icon: <MaterialCommunityIcons name="weight-lifter" size={22} color="#11B5CF" /> },
   ];
 
   const sleepOptions = [
-    { id: '4', label: '<5 HOURS', icon: <Feather name="moon" size={22} color="#0cb6ab" /> },
-    { id: '5', label: '5-6 HOURS', icon: <Feather name="clock" size={22} color="#0cb6ab" /> },
-    { id: '7', label: '6-8 HOURS', icon: <MaterialCommunityIcons name="sleep" size={22} color="#0cb6ab" /> },
-    { id: '9', label: '>8 HOURS', icon: <MaterialCommunityIcons name="emoticon-happy-outline" size={22} color="#0cb6ab" /> },
+    { id: '4', label: '<5 HOURS', icon: <Feather name="moon" size={22} color="#11B5CF" /> },
+    { id: '5', label: '5-6 HOURS', icon: <Feather name="clock" size={22} color="#11B5CF" /> },
+    { id: '7', label: '6-8 HOURS', icon: <MaterialCommunityIcons name="sleep" size={22} color="#11B5CF" /> },
+    { id: '9', label: '>8 HOURS', icon: <MaterialCommunityIcons name="emoticon-happy-outline" size={22} color="#11B5CF" /> },
   ];
 
   const dietPreferences = [
-    { id: 'Vegetarian', label: 'VEGETARIAN', icon: <MaterialCommunityIcons name="food-apple-outline" size={22} color="#0cb6ab" /> },
-    { id: 'Vegan', label: 'VEGAN', icon: <MaterialCommunityIcons name="leaf" size={22} color="#0cb6ab" /> },
-    { id: 'Omnivore', label: 'OMNIVORE', icon: <MaterialCommunityIcons name="food-steak" size={22} color="#0cb6ab" /> },
-    { id: 'Keto', label: 'KETO', icon: <MaterialCommunityIcons name="food-variant" size={22} color="#0cb6ab" /> },
-    { id: 'Other', label: 'OTHER', icon: <FontAwesome5 name="utensils" size={20} color="#0cb6ab" /> },
+    { id: 'Vegetarian', label: 'VEGETARIAN', icon: <MaterialCommunityIcons name="food-apple-outline" size={22} color="#11B5CF" /> },
+    { id: 'Vegan', label: 'VEGAN', icon: <MaterialCommunityIcons name="leaf" size={22} color="#11B5CF" /> },
+    { id: 'Omnivore', label: 'OMNIVORE', icon: <MaterialCommunityIcons name="food-steak" size={22} color="#11B5CF" /> },
+    { id: 'Keto', label: 'KETO', icon: <MaterialCommunityIcons name="food-variant" size={22} color="#11B5CF" /> },
+    { id: 'Other', label: 'OTHER', icon: <FontAwesome5 name="utensils" size={20} color="#11B5CF" /> },
   ];
 
   const handleNext = () => {
@@ -64,8 +76,25 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
       onNext(data);
     } else {
       // Default behavior when used as standalone page
-      // Navigate to the next step in the form flow
-      router.push('/health/forms/Wellness');
+      // Navigate to the next step in the form flow with all collected data
+      const wellnessParams = {
+        // Pass previous form data
+        name: previousData.name,
+        height: previousData.height,
+        weight: previousData.weight,
+        // Pass current form data
+        activityLevel: selectedActivityLevel,
+        sleepHours: selectedSleepHours,
+        dietPreference: selectedDietPreference
+      };
+      
+      // Debug: Log what data we're passing
+      console.log('LifestyleForm.tsx - Passing to Wellness:', wellnessParams);
+      
+      router.push({
+        pathname: '/health/forms/Wellness',
+        params: wellnessParams
+      });
     }
   };
 
@@ -91,8 +120,9 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
     <TouchableOpacity
       onPress={onPress}
       className={`flex-row items-center justify-between px-4 py-4 mb-2 rounded-lg border ${
-        isSelected ? 'bg-teal-50 border-teal-500' : 'bg-white border-gray-200'
+        isSelected ? 'bg-cyan-50 border-[#11B5CF]' : 'bg-white border-gray-200'
       }`}
+
     >
       <View className="flex-row items-center">
         <View className="w-6 h-6 mr-3 items-center justify-center">
@@ -100,7 +130,7 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
         </View>
         <Text
           className={`text-sm font-medium ${
-            isSelected ? 'text-teal-700' : 'text-gray-700'
+            isSelected ? 'text-[#11B5CF]' : 'text-gray-700'
           }`}
         >
           {option.label}
@@ -108,7 +138,7 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
       </View>
       <View
         className={`w-5 h-5 rounded-full border-2 ${
-          isSelected ? 'bg-teal-500 border-teal-500' : 'border-gray-300'
+          isSelected ? 'bg-[#11B5CF] border-[#11B5CF]' : 'border-gray-300'
         }`}
       >
         {isSelected && (
@@ -130,7 +160,7 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
 
         {/* Activity Level Section */}
         <View className="mb-8">
-          <Text className="text-lg font-semibold text-[#0cb6ab] mb-4">Activity Level</Text>
+          <Text className="text-lg font-semibold text-[#11B5CF] mb-4">Activity Level</Text>
           {activityLevels.map((level) => (
             <OptionButton
               key={level.id}
@@ -143,7 +173,7 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
 
         {/* Sleep Hours Section */}
         <View className="mb-8">
-          <Text className="text-lg font-semibold text-[#0cb6ab] mb-4">Sleep Hours</Text>
+          <Text className="text-lg font-semibold text-[#11B5CF] mb-4">Sleep Hours</Text>
           {sleepOptions.map((option) => (
             <OptionButton
               key={option.id}
@@ -156,7 +186,7 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
 
         {/* Diet Preference Section */}
         <View className="mb-8">
-          <Text className="text-lg font-semibold text-[#0cb6ab] mb-4">Diet Preference</Text>
+          <Text className="text-lg font-semibold text-[#11B5CF] mb-4">Diet Preference</Text>
           {dietPreferences.map((diet) => (
             <OptionButton
               key={diet.id}
@@ -183,7 +213,7 @@ const LifestyleForm: React.FC<LifestyleFormProps> = ({ onNext, onBack }) => {
           
           <TouchableOpacity
             onPress={handleNext}
-            className="bg-[#0cb6ab] py-3 px-6 rounded-lg"
+            className="bg-[#11B5CF] py-3 px-6 rounded-lg"
             activeOpacity={0.8}
           >
             <Text className="text-white font-semibold">NEXT</Text>

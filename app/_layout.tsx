@@ -52,14 +52,9 @@ export default function RootLayout() {
         headerShown: false,
       }}
     />
+
     <Stack.Screen
-      name="health/forms/MultiStepForm"
-      options={{
-        headerShown: false,
-      }}
-    />
-    <Stack.Screen
-      name="(tabs)"
+      name="navigation/tabs"
       options={{
         headerShown: false,
       }}
@@ -87,6 +82,26 @@ export default function RootLayout() {
       options={{
         headerShown: false,
       }}/>
+      <Stack.Screen
+      name="stress-assessment"
+      options={{
+        headerShown: false,
+      }}
+    />
+    <Stack.Screen
+      name="health/medication"
+      options={{
+        headerShown: false,
+      }}
+      />
+    <Stack.Screen
+     name="medicine-tracking"
+     options={{ 
+       headerShown: false,
+     }}   
+     />
+          
+    
       
   </Stack>;
 }

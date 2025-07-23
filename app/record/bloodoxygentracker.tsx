@@ -18,8 +18,9 @@ const BloodOxygenTracker = () => {
   const [notes, setNotes] = useState('');
   const [records, setRecords] = useState<BloodOxygenRecord[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [debugData, setDebugData] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [historyRecords, setHistoryRecords] = useState<BloodOxygenRecord[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Monitor records state changes
   useEffect(() => {
@@ -380,17 +381,17 @@ const BloodOxygenTracker = () => {
           )}
         </View>
 
-        {/* Previous Records */}
+        {/* Recent Records */}
         <View key={refreshKey} className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
-          <Text className="text-lg font-semibold text-gray-800 mb-4">Previous Records</Text>
+          <Text className="text-lg font-semibold text-gray-800 mb-4">Recent Records</Text>
           {records.length === 0 ? (
             <View className="items-center py-8">
               <Calendar className="w-12 h-12 text-gray-300 mb-2" />
-              <Text className="text-gray-400">No records yet</Text>
+              <Text className="text-gray-400">No recent records</Text>
               <Text className="text-gray-400 text-sm">Start by recording your first reading</Text>
             </View>
           ) : (
-            records.map((record) => {
+            records.slice(0, 5).map((record) => {
               const result = categorizeOxygen(record.oxygenLevel);
               return (
                 <View key={record.id} className="border-b border-gray-100 py-4 last:border-b-0">
@@ -427,19 +428,19 @@ const BloodOxygenTracker = () => {
               );
             })
           )}
+          {records.length > 5 && (
+            <View className="mt-4 pt-4 border-t border-gray-100">
+              <Text className="text-center text-gray-500 text-sm">
+                Showing 5 most recent records • {records.length} total records
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Debug Section */}
-        {debugData && (
-          <View className="bg-yellow-50 m-4 p-4 rounded-2xl border border-yellow-200">
-            <Text className="text-yellow-800 font-semibold mb-2">Debug Info:</Text>
-            <Text className="text-yellow-700 text-sm">Raw API Response:</Text>
-            <Text className="text-yellow-600 text-xs">{JSON.stringify(debugData, null, 2)}</Text>
-          </View>
-        )}
+
 
         {/* View History Button */}
-        <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
+        <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
           <TouchableOpacity
             className="bg-gray-100 rounded-lg p-4 items-center border border-gray-200"
             onPress={async () => {
@@ -509,11 +510,10 @@ const BloodOxygenTracker = () => {
                 });
                 
                 console.log('Valid records:', validRecords.length, 'out of', formattedRecords.length);
-                setRecords(validRecords);
-                setDebugData(data); // Store raw data for debugging
-                setRefreshKey(prev => prev + 1); // Force re-render
-                console.log('Records state updated with', validRecords.length, 'records');
-                Alert.alert('Success', `History refreshed successfully! Loaded ${validRecords.length} valid records.`);
+                setHistoryRecords(validRecords);
+                setShowHistory(true);
+                console.log('History records updated with', validRecords.length, 'records');
+                Alert.alert('Success', `History loaded successfully! Found ${validRecords.length} records.`);
               } catch (error) {
                 console.error('Error loading blood oxygen records:', error);
                 Alert.alert('Error', 'Failed to load history. Please check your connection and try again.');
@@ -527,6 +527,57 @@ const BloodOxygenTracker = () => {
             <Text className="text-gray-500 text-sm mt-1">Refresh all records from database</Text>
           </TouchableOpacity>
         </View>
+
+        {/* History Section */}
+        {showHistory && (
+          <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
+            <Text className="text-lg font-semibold text-gray-800 mb-4">History Records</Text>
+            {historyRecords.length === 0 ? (
+              <View className="items-center py-8">
+                <Calendar className="w-12 h-12 text-gray-300 mb-2" />
+                <Text className="text-gray-400">No history records found</Text>
+                <Text className="text-gray-400 text-sm">Try refreshing the history</Text>
+              </View>
+            ) : (
+              historyRecords.map((record) => {
+                const result = categorizeOxygen(record.oxygenLevel);
+                return (
+                  <View key={record.id} className="border-b border-gray-100 py-4 last:border-b-0">
+                    <View className="flex-row justify-between items-start mb-2">
+                      <View className="flex-1">
+                        <Text className="text-lg font-semibold text-gray-800">
+                          {record.oxygenLevel}% SpO₂
+                          {record.heartRate && (
+                            <Text className="text-sm font-normal text-gray-600"> • {record.heartRate} bpm</Text>
+                          )}
+                        </Text>
+                        <Text className="text-sm text-gray-500">{formatDate(record.timestamp)}</Text>
+                      </View>
+                      <View className={`${result.color} rounded-full px-3 py-1`}>
+                        <Text className="text-white text-xs font-semibold">{result.category}</Text>
+                      </View>
+                    </View>
+                    {record.notes && (
+                      <View className="bg-gray-50 rounded-lg p-3 mt-2">
+                        <Text className="text-gray-600 text-sm">{record.notes}</Text>
+                      </View>
+                    )}
+                    <View className="flex-row items-center mt-2">
+                      {result.urgency === 'URGENT' && <AlertCircle className="w-4 h-4 text-red-500 mr-1" />}
+                      <Text className={`text-xs ${result.textColor}`}>
+                        {result.urgency === 'URGENT' && 'Seek immediate medical attention'}
+                        {result.urgency === 'CONCERN' && 'Consult your healthcare provider'}
+                        {result.urgency === 'WATCH' && 'Monitor closely'}
+                        {result.urgency === 'GOOD' && 'Normal oxygen levels'}
+                        {result.urgency === 'EXCELLENT' && 'Excellent oxygen saturation'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

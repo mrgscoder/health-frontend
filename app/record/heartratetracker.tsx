@@ -12,6 +12,18 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { 
+  Heart, 
+  Activity, 
+  Clock, 
+  Plus, 
+  RefreshCw, 
+  TrendingUp, 
+  BarChart3, 
+  FileText,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react-native';
 
 const API_BASE_URL = 'http://192.168.1.16:5001/api/heart'; // Updated API URL
 const USER_ID = 1; // Default user ID
@@ -159,7 +171,7 @@ const HeartRateTracker = () => {
   };
 
   const getHeartRateStatus = (rate: number) => {
-    if (rate < 60) return { status: 'Low', color: 'text-blue-600', bg: 'bg-blue-100' };
+    if (rate < 60) return { status: 'Low', color: 'text-[#11B5CF]', bg: 'bg-[#11B5CF]' };
     if (rate <= 100) return { status: 'Normal', color: 'text-green-600', bg: 'bg-green-100' };
     if (rate <= 150) return { status: 'Elevated', color: 'text-yellow-600', bg: 'bg-yellow-100' };
     return { status: 'High', color: 'text-red-600', bg: 'bg-red-100' };
@@ -206,9 +218,12 @@ const HeartRateTracker = () => {
     >
       <View className="p-4">
         {/* Header */}
-        <Text className="text-3xl font-bold text-gray-800 mb-6 text-center">
-          ❤️ Heart Rate Tracker
-        </Text>
+        <View className="flex-row items-center justify-center mb-6">
+          <Heart size={32} color="#ef4444" className="mr-2" />
+          <Text className="text-3xl font-bold text-gray-800">
+            Heart Rate Tracker
+          </Text>
+        </View>
 
         {/* Add Heart Rate Form */}
         <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
@@ -239,39 +254,33 @@ const HeartRateTracker = () => {
           </View>
 
           <TouchableOpacity
-            className={`rounded-lg py-4 ${loading ? 'bg-gray-400' : 'bg-red-500'}`}
+            className={`rounded-lg py-4 flex-row items-center justify-center ${loading ? 'bg-gray-400' : 'bg-red-500'}`}
             onPress={addHeartRate}
             disabled={loading}
           >
-            <Text className="text-white text-center text-lg font-semibold">
-              {loading ? '⏳ Recording...' : '📊 Record Heart Rate'}
+            <Activity size={20} color="white" className="mr-2" />
+            <Text className="text-white text-lg font-semibold ml-2">
+              {loading ? 'Recording...' : 'Record Heart Rate'}
             </Text>
           </TouchableOpacity>
           
           {addingRecord && (
-            <View className="mt-3 p-3 bg-green-100 rounded-lg">
-              <Text className="text-green-700 text-center font-medium">
-                ✅ Record added! Refreshing data...
+            <View className="mt-3 p-3 bg-green-100 rounded-lg flex-row items-center">
+              <CheckCircle size={16} color="#16a34a" className="mr-2" />
+              <Text className="text-green-700 font-medium">
+                Record added! Refreshing data...
               </Text>
             </View>
           )}
-
-          {/* View History Button */}
-          <TouchableOpacity
-            className="bg-blue-500 rounded-lg py-4 mt-3"
-            onPress={fetchHeartRateRecords}
-            disabled={loading}
-          >
-            <Text className="text-white text-center text-lg font-semibold">
-              📋 View History
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Chart Section */}
         {chartData && (
           <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
-            <Text className="text-xl font-semibold text-gray-800 mb-4">📈 Recent Trends</Text>
+            <View className="flex-row items-center mb-4">
+              <TrendingUp size={24} color="#374151" className="mr-2" />
+              <Text className="text-xl font-semibold text-gray-800">Recent Trends</Text>
+            </View>
             <LineChart
               data={chartData}
               width={screenWidth - 80}
@@ -293,7 +302,10 @@ const HeartRateTracker = () => {
         {/* Statistics */}
         {records.length > 0 && (
           <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
-            <Text className="text-xl font-semibold text-gray-800 mb-4">📊 Quick Stats</Text>
+            <View className="flex-row items-center mb-4">
+              <BarChart3 size={24} color="#374151" className="mr-2" />
+              <Text className="text-xl font-semibold text-gray-800">Quick Stats</Text>
+            </View>
             <View className="flex-row justify-around">
               <View className="items-center">
                 <Text className="text-2xl font-bold text-red-500">
@@ -308,7 +320,7 @@ const HeartRateTracker = () => {
                 <Text className="text-gray-600">Average</Text>
               </View>
               <View className="items-center">
-                <Text className="text-2xl font-bold text-blue-500">
+                <Text className="text-2xl font-bold text-[#11B5CF]">
                   {records.length}
                 </Text>
                 <Text className="text-gray-600">Total</Text>
@@ -319,9 +331,12 @@ const HeartRateTracker = () => {
 
         {/* Records List */}
         <View className="bg-white rounded-xl p-6 shadow-sm">
-          <Text className="text-xl font-semibold text-gray-800 mb-4">
-            📋 Recent Records ({records.length})
-          </Text>
+          <View className="flex-row items-center mb-4">
+            <FileText size={24} color="#374151" className="mr-2" />
+            <Text className="text-xl font-semibold text-gray-800">
+              Recent Records ({records.length})
+            </Text>
+          </View>
 
           {loading && records.length === 0 ? (
             <View className="py-8">
@@ -352,22 +367,94 @@ const HeartRateTracker = () => {
                           </Text>
                         </View>
                       </View>
-                      <Text className="text-gray-500 text-sm">
-                        {formatDate(record.date_time)}
-                      </Text>
-                      {record.notes && (
-                        <Text className="text-gray-600 text-sm mt-1 italic">
-                          "{record.notes}"
+                      <View className="flex-row items-center">
+                        <Clock size={14} color="#6b7280" className="mr-1" />
+                        <Text className="text-gray-500 text-sm">
+                          {formatDate(record.date_time)}
                         </Text>
+                      </View>
+                      {record.notes && (
+                        <View className="flex-row items-start mt-1">
+                          <AlertCircle size={14} color="#6b7280" className="mr-1 mt-0.5" />
+                          <Text className="text-gray-600 text-sm italic flex-1">
+                            "{record.notes}"
+                          </Text>
+                        </View>
                       )}
                     </View>
-                    <Text className="text-gray-400 text-lg">❤️</Text>
+                    <Heart size={20} color="#ef4444" />
                   </View>
                 );
               })}
             </View>
           )}
         </View>
+
+        {/* View History Button */}
+        <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
+          <TouchableOpacity
+            className="bg-[#11B5CF] rounded-lg py-4 flex-row items-center justify-center"
+            onPress={fetchHeartRateRecords}
+            disabled={loading}
+          >
+            <FileText size={20} color="white" className="mr-2" />
+            <Text className="text-white text-lg font-semibold ml-2">
+              View Full History
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Full History Section - Show when records are loaded */}
+        {records.length > 0 && (
+          <View className="bg-white rounded-xl p-6 shadow-sm">
+            <View className="flex-row items-center mb-4">
+              <RefreshCw size={24} color="#374151" className="mr-2" />
+              <Text className="text-xl font-semibold text-gray-800">
+                Full History ({records.length} records)
+              </Text>
+            </View>
+
+            <View>
+              {records.map((record) => {
+                const status = getHeartRateStatus(record.rate);
+                return (
+                  <View 
+                    key={record.id} 
+                    className="flex-row items-center justify-between py-4 border-b border-gray-100"
+                  >
+                    <View className="flex-1">
+                      <View className="flex-row items-center mb-1">
+                        <Text className="text-2xl font-bold text-gray-800 mr-3">
+                          {record.rate}
+                        </Text>
+                        <View className={`px-2 py-1 rounded-full ${status.bg}`}>
+                          <Text className={`text-xs font-medium ${status.color}`}>
+                            {status.status}
+                          </Text>
+                        </View>
+                      </View>
+                      <View className="flex-row items-center">
+                        <Clock size={14} color="#6b7280" className="mr-1" />
+                        <Text className="text-gray-500 text-sm">
+                          {formatDate(record.date_time)}
+                        </Text>
+                      </View>
+                      {record.notes && (
+                        <View className="flex-row items-start mt-1">
+                          <AlertCircle size={14} color="#6b7280" className="mr-1 mt-0.5" />
+                          <Text className="text-gray-600 text-sm italic flex-1">
+                            "{record.notes}"
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Heart size={20} color="#ef4444" />
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </View>
     </ScrollView>
   );

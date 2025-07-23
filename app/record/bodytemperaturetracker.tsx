@@ -18,7 +18,6 @@ const TemperatureTracker = () => {
   const [notes, setNotes] = useState('');
   const [records, setRecords] = useState<TemperatureRecord[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [debugData, setDebugData] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Monitor records state changes
@@ -85,13 +84,29 @@ const TemperatureTracker = () => {
           return;
         }
         
-        const formattedRecords = records.map((record: any) => ({
-          id: record.id,
-          temperature: record.temperature,
-          unit: record.unit || 'C',
-          notes: record.notes || '',
-          timestamp: record.date_time || record.recorded_at || record.timestamp
-        }));
+        const formattedRecords = records.map((record: any) => {
+          // Validate and sanitize the record data
+          const temperature = parseFloat(record.temperature || record.temp_value || 0);
+          const unit = record.unit || 'C';
+          const notes = record.notes || record.notes_text || '';
+          const timestamp = record.date_time || record.recorded_at || record.timestamp || record.created_at;
+          
+          // Only include valid records
+          if (!record.id || isNaN(temperature) || temperature <= 0 || !timestamp) {
+            console.warn('Invalid temperature record found:', record);
+            return null;
+          }
+          
+          return {
+            id: record.id,
+            temperature: temperature,
+            unit: unit,
+            notes: notes,
+            timestamp: timestamp
+          };
+        }).filter(record => record !== null);
+        
+        console.log('Processed records:', formattedRecords.length);
         setRecords(formattedRecords);
       } catch (error) {
         console.error('Error loading temperature records:', error);
@@ -239,25 +254,57 @@ const TemperatureTracker = () => {
 
   // Prepare chart data (all converted to Celsius for consistency)
   const chartData = records.slice(0, 10).reverse().map((record, index) => {
-    const temp = record.unit === 'C' ? record.temperature : convertTemperature(record.temperature, 'F', 'C');
-    console.log(`Chart data record ${index}:`, { 
-      original: record.temperature, 
-      converted: temp, 
-      unit: record.unit,
-      isValid: temp != null && !isNaN(temp)
-    });
-    return {
-      name: `${index + 1}`,
-      temperature: temp,
-      date: new Date(record.timestamp).toLocaleDateString()
-    };
+    try {
+      const temp = record.unit === 'C' ? record.temperature : convertTemperature(record.temperature, 'F', 'C');
+      console.log(`Chart data record ${index}:`, { 
+        original: record.temperature, 
+        converted: temp, 
+        unit: record.unit,
+        isValid: temp != null && !isNaN(temp)
+      });
+      
+      // Validate the temperature value
+      if (temp == null || isNaN(temp) || temp <= 0) {
+        console.warn('Invalid temperature value for chart:', record);
+        return null;
+      }
+      
+      return {
+        name: `${index + 1}`,
+        temperature: temp,
+        date: new Date(record.timestamp).toLocaleDateString()
+      };
+    } catch (error) {
+      console.error('Error processing chart data record:', error, record);
+      return null;
+    }
   }).filter(item => {
-    const isValid = item.temperature != null && !isNaN(item.temperature);
-    if (!isValid) {
+    const isValid = item !== null && item.temperature != null && !isNaN(item.temperature);
+    if (!isValid && item !== null) {
       console.warn('Filtering out invalid temperature data:', item);
     }
     return isValid;
   });
+
+  // Create safe chart labels that handle different date formats
+  const createChartLabels = (data: Array<{ date: string; temperature: number; name: string } | null>) => {
+    return data.map(d => {
+      if (!d || !d.date) {
+        return 'N/A';
+      }
+      try {
+        const dateParts = d.date.split('/');
+        if (dateParts.length >= 2) {
+          return `${dateParts[1]}/${dateParts[0]}`;
+        }
+        // Fallback for different date formats
+        return d.date;
+      } catch (error) {
+        console.warn('Error parsing date for chart label:', d.date);
+        return 'N/A';
+      }
+    });
+  };
 
   const trends = calculateTrends();
   const latestReading = records[0];
@@ -353,45 +400,64 @@ const TemperatureTracker = () => {
         {records.length > 0 && (
           <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
             <Text className="text-lg font-semibold text-gray-800 mb-4">Temperature Trend (°C)</Text>
-            {chartData.filter(d => d.temperature != null && !isNaN(d.temperature)).length > 0 ? (
-              <LineChart
-                data={{
-                  labels: chartData.filter(d => d.temperature != null && !isNaN(d.temperature)).map(d => d.date.split('/')[1] + '/' + d.date.split('/')[0]),
-                  datasets: [
-                    {
-                      data: chartData.filter(d => d.temperature != null && !isNaN(d.temperature)).map(d => d.temperature),
-                      color: (opacity = 1) => `rgba(0, 184, 241, ${opacity})`, // #00b8f1
-                      strokeWidth: 3,
-                    }
-                  ],
-                  legend: ['Temperature (°C)'],
-                }}
-                width={Dimensions.get('window').width - 48}
-                height={220}
-                yAxisSuffix="°"
-                chartConfig={{
-                  backgroundColor: '#fff',
-                  backgroundGradientFrom: '#fff',
-                  backgroundGradientTo: '#fff',
-                  decimalPlaces: 1,
-                  color: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                  style: { borderRadius: 16 },
-                  propsForDots: {
-                    r: '4',
-                    strokeWidth: '2',
-                    stroke: '#fff',
-                  },
-                }}
-                bezier
-                style={{ borderRadius: 16 }}
-              />
-            ) : (
-              <View className="items-center py-8">
-                <Text className="text-gray-400">No valid temperature data available for chart</Text>
-                <Text className="text-gray-400 text-sm">Record some temperature readings to see trends</Text>
-              </View>
-            )}
+            {(() => {
+              const validChartData = chartData.filter((d): d is { date: string; temperature: number; name: string } => 
+                d !== null && d.temperature != null && !isNaN(d.temperature)
+              );
+              if (validChartData.length > 0) {
+                try {
+                  return (
+                    <LineChart
+                      data={{
+                        labels: createChartLabels(validChartData),
+                        datasets: [
+                          {
+                            data: validChartData.map(d => d.temperature),
+                            color: (opacity = 1) => `rgba(0, 184, 241, ${opacity})`, // #00b8f1
+                            strokeWidth: 3,
+                          }
+                        ],
+                        legend: ['Temperature (°C)'],
+                      }}
+                      width={Dimensions.get('window').width - 48}
+                      height={220}
+                      yAxisSuffix="°"
+                      chartConfig={{
+                        backgroundColor: '#fff',
+                        backgroundGradientFrom: '#fff',
+                        backgroundGradientTo: '#fff',
+                        decimalPlaces: 1,
+                        color: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
+                        labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                        style: { borderRadius: 16 },
+                        propsForDots: {
+                          r: '4',
+                          strokeWidth: '2',
+                          stroke: '#fff',
+                        },
+                      }}
+                      bezier
+                      style={{ borderRadius: 16 }}
+                    />
+                  );
+                } catch (error) {
+                  console.error('Error rendering chart:', error);
+                  return (
+                    <View className="items-center py-8">
+                      <Text className="text-gray-400">Error rendering chart</Text>
+                      <Text className="text-gray-400 text-sm">Please try refreshing the data</Text>
+                    </View>
+                  );
+                }
+              } else {
+                return (
+                  <View className="items-center py-8">
+                    <Text className="text-gray-400">No valid temperature data available for chart</Text>
+                    <Text className="text-gray-400 text-sm">Record some temperature readings to see trends</Text>
+                  </View>
+                );
+              }
+            })()}
             <View className="flex-row justify-center mt-2">
               <View className="flex-row items-center">
                 <View className="w-4 h-4 bg-[#00b8f1] rounded mr-2"></View>
@@ -452,15 +518,6 @@ const TemperatureTracker = () => {
           )}
         </View>
 
-        {/* Debug Section */}
-        {debugData && (
-          <View className="bg-yellow-50 m-4 p-4 rounded-2xl border border-yellow-200">
-            <Text className="text-yellow-800 font-semibold mb-2">Debug Info:</Text>
-            <Text className="text-yellow-700 text-sm">Raw API Response:</Text>
-            <Text className="text-yellow-600 text-xs">{JSON.stringify(debugData, null, 2)}</Text>
-          </View>
-        )}
-
         {/* View History Button */}
         <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
           <TouchableOpacity
@@ -490,13 +547,9 @@ const TemperatureTracker = () => {
 
                 const responseData = await response.json();
                 console.log('Fetched temperature records:', responseData);
-                console.log('Data type:', typeof responseData);
                 
                 // Handle the correct API response format
                 const records = responseData.records || responseData;
-                console.log('Records data:', records);
-                console.log('Records type:', typeof records);
-                console.log('Records length:', Array.isArray(records) ? records.length : 'Not an array');
                 
                 if (!Array.isArray(records)) {
                   console.error('API response is not an array:', responseData);
@@ -505,16 +558,11 @@ const TemperatureTracker = () => {
                 }
                 
                 const formattedRecords = records.map((record: any) => {
-                  console.log('Processing record:', record);
-                  console.log('Record fields:', Object.keys(record));
-                  
                   // Handle different possible field names from database
                   const temperature = record.temperature || record.temp_value;
                   const unit = record.unit || 'C';
                   const notes = record.notes || record.notes_text || '';
                   const timestamp = record.date_time || record.recorded_at || record.timestamp || record.created_at;
-                  
-                  console.log('Mapped values:', { temperature, unit, notes, timestamp });
                   
                   return {
                     id: record.id,
@@ -524,8 +572,6 @@ const TemperatureTracker = () => {
                     timestamp: timestamp
                   };
                 });
-                
-                console.log('Formatted records:', formattedRecords);
                 
                 // Validate that we have proper data
                 const validRecords = formattedRecords.filter(record => {
@@ -538,7 +584,6 @@ const TemperatureTracker = () => {
                 
                 console.log('Valid records:', validRecords.length, 'out of', formattedRecords.length);
                 setRecords(validRecords);
-                setDebugData(responseData); // Store raw data for debugging
                 setRefreshKey(prev => prev + 1); // Force re-render
                 console.log('Records state updated with', validRecords.length, 'records');
                 Alert.alert('Success', `History refreshed successfully! Loaded ${validRecords.length} valid records.`);
@@ -555,6 +600,57 @@ const TemperatureTracker = () => {
             <Text className="text-gray-500 text-sm mt-1">Refresh all records from database</Text>
           </TouchableOpacity>
         </View>
+
+        {/* History Records Section */}
+        {records.length > 0 && (
+          <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-semibold text-gray-800">History Records</Text>
+              <View className="bg-blue-100 rounded-full px-3 py-1">
+                <Text className="text-blue-600 text-sm font-medium">{records.length} records</Text>
+              </View>
+            </View>
+            {records.map((record) => {
+              const result = categorizeTemperature(record.temperature, record.unit);
+              return (
+                <View key={record.id} className="border border-gray-200 rounded-lg p-4 mb-3 bg-gray-50">
+                  <View className="flex-row justify-between items-start mb-2">
+                    <View className="flex-1">
+                      <Text className="text-lg font-semibold text-gray-800">
+                        {record.temperature}°{record.unit}
+                        <Text className="text-sm font-normal text-gray-600">
+                          {' '}({record.unit === 'C' ? 
+                            Math.round(convertTemperature(record.temperature, 'C', 'F') * 10) / 10 :
+                            Math.round(convertTemperature(record.temperature, 'F', 'C') * 10) / 10
+                          }°{record.unit === 'C' ? 'F' : 'C'})
+                        </Text>
+                      </Text>
+                      <Text className="text-sm text-gray-500">{formatDate(record.timestamp)}</Text>
+                    </View>
+                    <View className={`${result.color} rounded-full px-3 py-1`}>
+                      <Text className="text-white text-xs font-semibold">{result.category}</Text>
+                    </View>
+                  </View>
+                  {record.notes && (
+                    <View className="bg-white rounded-lg p-3 mt-2 border border-gray-200">
+                      <Text className="text-gray-600 text-sm">{record.notes}</Text>
+                    </View>
+                  )}
+                  <View className="flex-row items-center mt-2">
+                    {result.urgency === 'URGENT' && <AlertCircle className="w-4 h-4 text-red-500 mr-1" />}
+                    <Text className={`text-xs ${result.textColor}`}>
+                      {result.urgency === 'URGENT' && 'Seek immediate medical attention'}
+                      {result.urgency === 'CONCERN' && 'Consult your healthcare provider'}
+                      {result.urgency === 'WATCH' && 'Monitor closely'}
+                      {result.urgency === 'GOOD' && 'Normal body temperature'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
       </ScrollView>
     </SafeAreaView>
   );

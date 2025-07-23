@@ -57,10 +57,8 @@ const RespiratoryRateTracker = () => {
         setRecords(data || []);
         if (data && data.length > 0) {
           console.log(`📈 Found ${data.length} respiratory rate records in database`);
-          Alert.alert('Success', `Found ${data.length} respiratory rate records in your history.`);
         } else {
           console.log('📭 No respiratory rate records found in database');
-          Alert.alert('No Records', 'No respiratory rate records found in your history.');
         }
       } else {
         console.error('❌ Failed to fetch respiratory rate records:', data.error);
@@ -384,6 +382,45 @@ const RespiratoryRateTracker = () => {
             </View>
             <Text className="text-gray-500 text-sm mt-1">View all respiratory rate records from database</Text>
           </TouchableOpacity>
+          
+          {/* History Records Display */}
+          {records.length > 0 && (
+            <View className="mt-6">
+              <Text className="text-lg font-semibold text-gray-800 mb-4">History Records</Text>
+              {records.map((record) => {
+                const result = categorizeRespiratoryRate(record.respiratoryRate);
+                return (
+                  <View key={record.id} className="border-b border-gray-100 py-4 last:border-b-0">
+                    <View className="flex-row justify-between items-start mb-2">
+                      <View className="flex-1">
+                        <Text className="text-lg font-semibold text-gray-800">
+                          {record.respiratoryRate} breaths/min
+                        </Text>
+                        <Text className="text-sm text-gray-500">{formatDate(record.timestamp)}</Text>
+                      </View>
+                      <View className={`${result.color} rounded-full px-3 py-1`}>
+                        <Text className="text-white text-xs font-semibold">{result.category}</Text>
+                      </View>
+                    </View>
+                    {record.notes && (
+                      <View className="bg-gray-50 rounded-lg p-3 mt-2">
+                        <Text className="text-gray-600 text-sm">{record.notes}</Text>
+                      </View>
+                    )}
+                    <View className="flex-row items-center mt-2">
+                      {result.urgency === 'URGENT' && <AlertCircle className="w-4 h-4 text-red-500 mr-1" />}
+                      <Text className={`text-xs ${result.textColor}`}>
+                        {result.urgency === 'URGENT' && 'Seek immediate medical attention'}
+                        {result.urgency === 'CONCERN' && 'Consult your healthcare provider'}
+                        {result.urgency === 'WATCH' && 'Monitor closely'}
+                        {result.urgency === 'GOOD' && 'Normal respiratory rate'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

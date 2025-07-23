@@ -1,21 +1,19 @@
 import { Feather, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 
 // TypeScript types for form data and errors
 interface FormData {
-  fullName: string;
   email: string;
   gender: 'Male' | 'Female' | 'Other' | '';
   password: string;
   verificationCode: string;
 }
 interface FormErrors {
-  fullName?: string;
   email?: string;
   gender?: string;
   password?: string;
@@ -24,8 +22,8 @@ interface FormErrors {
 
 const SignUpPage = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [formData, setFormData] = useState<FormData>({
-    fullName: '',
     email: '',
     gender: '',
     password: '',
@@ -39,6 +37,31 @@ const SignUpPage = () => {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [codeVerified, setCodeVerified] = useState(false);
+  const [userName, setUserName] = useState<string>('');
+
+  // Get name from params or AsyncStorage
+  useEffect(() => {
+    const getName = async () => {
+      try {
+        // First try to get name from route params
+        const nameFromParams = params.name as string;
+        if (nameFromParams) {
+          setUserName(nameFromParams);
+          return;
+        }
+        
+        // Fallback to AsyncStorage
+        const storedName = await AsyncStorage.getItem('userFullName');
+        if (storedName) {
+          setUserName(storedName);
+        }
+      } catch (error) {
+        console.log('Error getting name:', error);
+      }
+    };
+    
+    getName();
+  }, [params.name]);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -116,8 +139,7 @@ const SignUpPage = () => {
 
   const validateForm = () => {
     const newErrors: FormErrors = {};
-    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-    else if (formData.fullName.trim().length < 2) newErrors.fullName = 'Name must be at least 2 characters';
+    if (!userName.trim()) newErrors.email = 'Name is required. Please complete the health assessment first.';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Please enter a valid email address';
     if (!formData.password.trim()) newErrors.password = 'Password is required';
@@ -134,14 +156,14 @@ const SignUpPage = () => {
     try {
       // Call the register API
       const response = await axios.post('http://192.168.1.16:5001/api/auth/register', {
-        name: formData.fullName,
+        name: userName,
         email: formData.email,
         password: formData.password
       });
 
       if (response.status === 201) {
         // Save user's full name and gender to AsyncStorage
-        await AsyncStorage.setItem('userFullName', formData.fullName);
+        await AsyncStorage.setItem('userFullName', userName);
         await AsyncStorage.setItem('userGender', formData.gender);
         
         // If the API returns a token, save it
@@ -164,8 +186,6 @@ const SignUpPage = () => {
     }
   };
 
-
-
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
       <ScrollView
@@ -177,23 +197,17 @@ const SignUpPage = () => {
           <Text className="text-2xl font-bold text-gray-800 mb-2 text-center">Create Account</Text>
           <Text className="text-base text-xs text-gray-500 mb-6 text-center">Join us and start your journey today!</Text>
 
-          {/* Full Name */}
-          <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'fullName' ? 'border-cyan-500' : 'border-gray-200'}`}>
-            <MaterialIcons name="person" size={20} color="#6b7280" className="mr-3" />
-            <TextInput
-              className="flex-1 text-base text-gray-700 font-medium"
-              placeholder="Full Name"
-              value={formData.fullName}
-              onChangeText={text => handleInputChange('fullName', text)}
-              autoCapitalize="words"
-              onFocus={() => setFocusedField('fullName')}
-              onBlur={() => setFocusedField(null)}
-            />
-          </View>
-          {errors.fullName ? <Text className="text-red-500 text-sm font-medium mb-2 ml-2 self-start">{errors.fullName}</Text> : null}
+          {/* Display User Name */}
+          {userName && (
+            <View className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 mb-3">
+              <Text className="text-green-800 text-sm font-medium text-center">
+                Welcome, {userName}! Your health assessment is complete.
+              </Text>
+            </View>
+          )}
 
           {/* Email */}
-          <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'email' ? 'border-cyan-500' : 'border-gray-200'}`}>
+          <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'email' ? 'border-[#11B5CF]' : 'border-gray-200'}`}>
             <MaterialIcons name="email" size={20} color="#6b7280" className="mr-3" />
             <TextInput
               className="flex-1 text-base text-gray-700 font-medium"
@@ -211,7 +225,7 @@ const SignUpPage = () => {
           {/* Send OTP Button */}
           <TouchableOpacity
             className={`h-12 rounded-2xl items-center justify-center mb-3 w-full shadow-lg ${
-              otpSent ? 'bg-green-500' : 'bg-cyan-500'
+              otpSent ? 'bg-green-500' : 'bg-[#11B5CF]'
             }`}
             onPress={handleSendOtp}
             disabled={isSendingOtp || otpSent}
@@ -231,7 +245,7 @@ const SignUpPage = () => {
           {/* Verification Code - Only show after OTP is sent */}
           {otpSent && (
             <>
-              <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'verificationCode' ? 'border-cyan-500' : 'border-gray-200'}`}>
+              <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'verificationCode' ? 'border-[#11B5CF]' : 'border-gray-200'}`}>
                 <MaterialIcons name="verified-user" size={20} color="#6b7280" className="mr-3" />
                 <TextInput
                   className="flex-1 text-base text-gray-700 font-medium"
@@ -254,7 +268,7 @@ const SignUpPage = () => {
               {/* Verify Code Button */}
               <TouchableOpacity
                 className={`h-12 rounded-2xl items-center justify-center mb-3 w-full shadow-lg ${
-                  codeVerified ? 'bg-green-500' : 'bg-cyan-500'
+                  codeVerified ? 'bg-green-500' : 'bg-[#11B5CF]'
                 }`}
                 onPress={handleVerifyCode}
                 disabled={isVerifyingCode || codeVerified}
@@ -285,9 +299,9 @@ const SignUpPage = () => {
                   accessibilityRole="radio"
                   accessibilityState={{ selected: formData.gender === option }}
                 >
-                  <View className="h-5 w-5 rounded-full border-2 border-cyan-500 items-center justify-center mr-1.5">
+                  <View className="h-5 w-5 rounded-full border-2 border-[#11B5CF] items-center justify-center mr-1.5">
                     {formData.gender === option && (
-                      <View className="h-2.5 w-2.5 rounded-full bg-cyan-500" />
+                      <View className="h-2.5 w-2.5 rounded-full bg-[#11B5CF]" />
                     )}
                   </View>
                   <Text className="text-gray-700 font-medium">{option}</Text>
@@ -298,7 +312,7 @@ const SignUpPage = () => {
           </View>
 
           {/* Password */}
-          <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'password' ? 'border-cyan-500' : 'border-gray-200'}`}>
+          <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'password' ? 'border-[#11B5CF]' : 'border-gray-200'}`}>
             <MaterialIcons name="lock" size={20} color="#6b7280" className="mr-3" />
             <TextInput
               className="flex-1 text-base text-gray-700 font-medium"
@@ -314,7 +328,7 @@ const SignUpPage = () => {
 
           {/* Create Account Button */}
           <TouchableOpacity 
-            className="bg-cyan-500 h-14 rounded-2xl items-center justify-center mt-4 w-full shadow-lg" 
+            className="bg-[#11B5CF] h-14 rounded-2xl items-center justify-center mt-4 w-full shadow-lg" 
             onPress={handleSignUp} 
             disabled={isLoading}
           >
@@ -337,19 +351,16 @@ const SignUpPage = () => {
             </Text>
           </View>
 
-
-         
-
           {/* Terms */}
           <Text className="text-xs text-gray-500 text-center mt-4 leading-5">
-            By creating an account, you agree to our <Text className="text-cyan-500 font-semibold">Terms of Service</Text> and <Text className="text-cyan-500 font-semibold">Privacy Policy</Text>.
+            By creating an account, you agree to our <Text className="text-[#11B5CF] font-semibold">Terms of Service</Text> and <Text className="text-[#11B5CF] font-semibold">Privacy Policy</Text>.
           </Text>
 
           {/* Sign In Link */}
           <View className="items-center mt-4">
             <Text className="text-gray-500">
               Already have an account?{' '}
-              <Text className="text-cyan-500 font-semibold" onPress={() => router.push('/health/Account')}>Sign In</Text>
+              <Text className="text-[#11B5CF] font-semibold" onPress={() => router.push('/health/Account')}>Sign In</Text>
             </Text>
           </View>
         </View>

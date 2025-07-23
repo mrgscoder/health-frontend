@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-chart-kit';
-import { Heart, Calendar, TrendingUp, AlertCircle, Check } from 'lucide-react-native';
+import { Calendar, TrendingUp, AlertCircle, Check } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface BloodPressureRecord {
@@ -19,6 +19,9 @@ const BloodPressureTracker = () => {
   const [notes, setNotes] = useState('');
   const [records, setRecords] = useState<BloodPressureRecord[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyRecords, setHistoryRecords] = useState<BloodPressureRecord[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Load blood pressure records from API
   useEffect(() => {
@@ -38,7 +41,7 @@ const BloodPressureTracker = () => {
           return;
         }
 
-        const response = await fetch('http://192.168.1.16:5001/api/auth/getbp', {
+        const response = await fetch('http://192.168.1.16:5001/api/bp/getbp', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -144,7 +147,7 @@ const BloodPressureTracker = () => {
         return;
       }
 
-      const response = await fetch('http://192.168.1.16:5001/api/auth/postbp', {
+      const response = await fetch('http://192.168.1.16:5001/api/bp/addbp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -160,7 +163,13 @@ const BloodPressureTracker = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to record blood pressure:', response.status, errorText);
-        Alert.alert('Error', 'Failed to record blood pressure. Please try again.');
+        console.error('Request URL:', 'http://192.168.1.16:5001/api/bp/addbp');
+        console.error('Request body:', JSON.stringify({
+          systolic: parseInt(systolic),
+          diastolic: parseInt(diastolic),
+          notes: notes.trim() || null
+        }));
+        Alert.alert('Error', `Failed to record blood pressure (${response.status}). Please try again.`);
         return;
       }
 
@@ -196,6 +205,49 @@ const BloodPressureTracker = () => {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Fetch history data
+  const fetchHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to view history');
+        return;
+      }
+
+      const response = await fetch('http://192.168.1.16:5001/api/bp/getbp', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch history:', response.status, errorText);
+        Alert.alert('Error', 'Failed to fetch history. Please try again.');
+        return;
+      }
+
+      const data = await response.json();
+      const formattedRecords = data.map((record: any) => ({
+        id: record.id,
+        systolic: record.systolic,
+        diastolic: record.diastolic,
+        notes: record.notes || '',
+        timestamp: record.recorded_at
+      }));
+      
+      setHistoryRecords(formattedRecords);
+      setShowHistory(true);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+      Alert.alert('Error', 'Failed to fetch history. Please check your connection and try again.');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   // Calculate trends
   const calculateTrends = () => {
     if (records.length < 0) return null;
@@ -223,9 +275,8 @@ const BloodPressureTracker = () => {
       <ScrollView className="flex-1">
         {/* Header */}
         <View className="bg-white p-4 shadow-sm">
-          <View className="flex-row items-center">
-            <Heart className="w-6 h-6 text-red-500 mr-4 ml-4" />
-            <Text className="text-xl  font-bold text-gray-800 ml-2">Blood Pressure</Text>
+          <View className="flex-row items-center justify-center">
+            <Text className="text-xl font-bold text-gray-800">Blood Pressure</Text>
           </View>
         </View>
 
@@ -299,25 +350,7 @@ const BloodPressureTracker = () => {
           </View>
         )}
 
-        {/* Trends Summary */}
-        {trends && (
-          <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
-            <View className="flex-row items-center mb-4">
-              <TrendingUp className="w-5 h-5 text-blue-500 mr-2" />
-              <Text className="text-lg font-semibold text-gray-800">Recent Trends (Last 5 readings)</Text>
-            </View>
-            <View className="flex-row justify-between">
-              <View className="flex-1 bg-blue-50 rounded-lg p-4 mr-2">
-                <Text className="text-blue-600 font-semibold">Avg Systolic</Text>
-                <Text className="text-2xl font-bold text-blue-700">{trends.avgSystolic}</Text>
-              </View>
-              <View className="flex-1 bg-purple-50 rounded-lg p-4 ml-2">
-                <Text className="text-purple-600 font-semibold">Avg Diastolic</Text>
-                <Text className="text-2xl font-bold text-purple-700">{trends.avgDiastolic}</Text>
-              </View>
-            </View>
-          </View>
-        )}
+
 
         {/* Chart */}
         {records.length > 0 && (
@@ -334,7 +367,7 @@ const BloodPressureTracker = () => {
                   },
                   {
                     data: chartData.map(d => d.diastolic),
-                    color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`, // blue
+                    color: (opacity = 1) => `rgba(17, 181, 207, ${opacity})`, // #11B5CF
                     strokeWidth: 2,
                   },
                 ],
@@ -365,7 +398,7 @@ const BloodPressureTracker = () => {
                 <Text className="text-sm text-gray-600">Systolic</Text>
               </View>
               <View className="flex-row items-center">
-                <View className="w-4 h-4 bg-blue-500 rounded mr-2"></View>
+                <View className="w-4 h-4 rounded mr-2" style={{backgroundColor: '#11B5CF'}}></View>
                 <Text className="text-sm text-gray-600">Diastolic</Text>
               </View>
             </View>
@@ -373,7 +406,7 @@ const BloodPressureTracker = () => {
         )}
 
         {/* Previous Records */}
-        <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
+        <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
           <Text className="text-lg font-semibold text-gray-800 mb-4">Previous Records</Text>
           {records.length === 0 ? (
             <View className="items-center py-8">
@@ -417,6 +450,66 @@ const BloodPressureTracker = () => {
             })
           )}
         </View>
+
+        {/* View History Button */}
+        <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
+          <TouchableOpacity
+            className="bg-gray-100 rounded-lg p-4 items-center"
+            onPress={fetchHistory}
+            disabled={loadingHistory}
+          >
+            <Text className="text-gray-700 text-lg font-semibold">
+              {loadingHistory ? 'Loading...' : 'View History'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* History Records */}
+        {showHistory && (
+          <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
+            <Text className="text-lg font-semibold text-gray-800 mb-4">Complete History</Text>
+            {historyRecords.length === 0 ? (
+              <View className="items-center py-8">
+                <Calendar className="w-12 h-12 text-gray-300 mb-2" />
+                <Text className="text-gray-400">No history records found</Text>
+              </View>
+            ) : (
+              historyRecords.map((record) => {
+                const result = categorizeBP(record.systolic, record.diastolic);
+                return (
+                  <View key={record.id} className="border-b border-gray-100 py-4 last:border-b-0">
+                    <View className="flex-row justify-between items-start mb-2">
+                      <View className="flex-1">
+                        <Text className="text-lg font-semibold text-gray-800">
+                          {record.systolic}/{record.diastolic} mmHg
+                        </Text>
+                        <Text className="text-sm text-gray-500">{formatDate(record.timestamp)}</Text>
+                      </View>
+                      <View className={`${result.color} rounded-full px-3 py-1`}>
+                        <Text className="text-white text-xs font-semibold">{result.category}</Text>
+                      </View>
+                    </View>
+                    {record.notes && (
+                      <View className="bg-gray-50 rounded-lg p-3 mt-2">
+                        <Text className="text-gray-600 text-sm">{record.notes}</Text>
+                      </View>
+                    )}
+                    <View className="flex-row items-center mt-2">
+                      {result.urgency === 'URGENT' && <AlertCircle className="w-4 h-4 text-red-500 mr-1" />}
+                      <Text className={`text-xs ${result.textColor}`}>
+                        {result.urgency === 'URGENT' && 'Seek immediate medical attention'}
+                        {result.urgency === 'HIGH' && 'Consult your healthcare provider'}
+                        {result.urgency === 'MODERATE' && 'Monitor closely'}
+                        {result.urgency === 'WATCH' && 'Continue healthy lifestyle'}
+                        {result.urgency === 'GOOD' && 'Keep up the good work'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

@@ -6,10 +6,10 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
-  ImageBackground,
   Alert,
   RefreshControl
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BarChart } from 'react-native-chart-kit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -133,10 +133,9 @@ export default function CreateHistory() {
   };
 
   return (
-    <ImageBackground
-      source={require('../../assets/images/night-bg.jpg')}
+    <LinearGradient
+      colors={['#0f0f23', '#1a1a2e', '#16213e', '#0f3460']}
       style={styles.bg}
-      resizeMode="cover"
     >
       <ScrollView 
         style={styles.container}
@@ -224,7 +223,7 @@ export default function CreateHistory() {
           );
         })}
       </ScrollView>
-    </ImageBackground>
+    </LinearGradient>
   );
 }
 
@@ -246,7 +245,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: 'rgba(10, 15, 36, 0.8)',
     padding: 16,
   },
   title: {

@@ -1,62 +1,65 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, Image, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
 
 const WelcomeScreen = () => {
   const handleGetStarted = () => {
-    router.push('/health/forms/Inform'); // navigate to the Index tab (home screen)
+    router.push('/health/forms/Inform');
   };
 
   const handleAlreadyHaveAccount = () => {
-    router.push('/health/Account'); // navigate to Account.tsx in the forms folder
+    router.push('/health/Account');
   };
 
   return (
-    <View className="flex-1 bg-[#0cb6ab]">
-      <StatusBar barStyle="light-content" backgroundColor="black" />
+    <SafeAreaView className="flex-1 bg-white">
+      <StatusBar barStyle="dark-content" backgroundColor="white" />
 
-      {/* Main Container */}
-      <View className="flex-1 justify-between items-center px-8 pt-20">
-        
-        {/* Logo and Text */}
-        <View className="flex-1 justify-center items-center">
+      <View className="flex-1 justify-between items-center px-6 pt-10 pb-8">
+
+        {/* Logo and App Name */}
+        <View className="items-center">
+          <Image
+            source={require('../../assets/images/leaf.png')}
+            style={{ width: 150, height: 150, marginBottom: 16 }}
+            resizeMode="stretch"
+          />
+          <Text className="text-[#11B5CF] font-bold text-3xl ">HealthMed Pro</Text>
+        </View>
+
+        {/* Illustration */}
+        <View className="flex-1 justify-center items-center ">
           <Image
             source={require('../../assets/images/icon.png')}
-            className="w-80 h-80"
+            className="w-150 h-150"
             resizeMode="contain"
           />
-           <Text className="text-black font-bold font-serif text-3xl text-center mt-4">
-            HealthSync
-          </Text>
-          <Text className="text-black text-md text-center mt-4">
-            Kickstart your journey to a{'\n'} stronger, healthier you! {'\n'}
-          </Text>
         </View>
 
         {/* Buttons */}
-        <View className="w-full mb-20">
+        <View className="w-full">
           <TouchableOpacity
             onPress={handleGetStarted}
-            className="bg-[#dffd6e] rounded-full py-4 mb-4"
-            activeOpacity={0.8}
+            className="bg-[#11B5CF] rounded-full py-4 mb-4 shadow-md"
+            activeOpacity={0.9}
           >
-            <Text className="text-black text-md font-bold text-center">
-              GET STARTED
+            <Text className="text-white text-lg font-semibold text-center">
+              Get Started
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleAlreadyHaveAccount}
-            className="border border-[#dffd6e] rounded-full py-4"
+            className="border border-[#11B5CF] rounded-full py-3"
             activeOpacity={0.8}
           >
-            <Text className="text-[#dffd6e] text-md font-bold text-center">
-              I ALREADY HAVE AN ACCOUNT
+            <Text className="text-[#11B5CF] text-base font-semibold text-center">
+              I Already Have an Account
             </Text>
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

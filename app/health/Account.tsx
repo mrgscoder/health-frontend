@@ -39,7 +39,7 @@ const Account = () => {
         Alert.alert('Success', 'Login successful!', [
           {
             text: 'OK',
-            onPress: () => router.push('/(tabs)')
+            onPress: () => router.push('/navigation/tabs')
           }
         ]);
       } else {
@@ -128,7 +128,7 @@ const Account = () => {
         {/* Sign In Button */}
         <View className="items-center">
           <TouchableOpacity 
-            className={`w-full py-3 mb-8 rounded-3xl ${isLoading ? 'bg-gray-400' : 'bg-[#0cb6ab]'}`}
+            className={`w-full py-3 mb-8 rounded-3xl ${isLoading ? 'bg-gray-400' : 'bg-[#11B5CF]'}`}
             onPress={handleSignIn}
             disabled={isLoading}
           >
