@@ -93,6 +93,20 @@ const _layout = () => {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="BodyFatScreen"
+        options={{
+          title: 'Body Fat Calculator',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="BodyFatHistory"
+        options={{
+          title: 'Body Fat History',
+          headerShown: false,
+        }}
+      />
     
     </Stack>
    

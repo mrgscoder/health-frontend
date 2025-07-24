@@ -20,7 +20,8 @@ const HealthTrackerDashboard = () => {
     temperature: { current: 98.6, target: 98.6 },
     respiratoryRate: { current: 16, target: 18 },
     bloodOxygen: { current: 98, target: 100 },
-    bloodSugar: { current: 110, target: 140 }
+    bloodSugar: { current: 110, target: 140 },
+    bodyFat: { current: 20, target: 18 }
   });
 
   const [userName, setUserName] = useState('');
@@ -156,10 +157,6 @@ const HealthTrackerDashboard = () => {
       router.push('/stress-assessment');
       return;
     }
-    if (itemId === 'medicineTracking') {
-      router.push('/medicine-tracking');
-      return;
-    }
     if (itemId === 'cardio') {
       router.push('/record/Cardio');
       return;
@@ -168,6 +165,11 @@ const HealthTrackerDashboard = () => {
       router.push('/record/AddSugarReading');
       return;
     }
+    if (itemId === 'bodyFat') {
+      router.push('/record/BodyFatScreen');
+      return;
+    }
+
     // Default selection logic
     const newSelected = new Set(selectedItems);
     if (newSelected.has(itemId)) {
@@ -352,11 +354,20 @@ const HealthTrackerDashboard = () => {
                   target={goals.bloodSugar.target}
                   unit=" mg/dL"
                 />
+                <StatCard
+                  id="bodyFat"
+                  icon={Scale}  
+                  title="Body Fat"
+                  current={goals.bodyFat.current}
+                  target={goals.bodyFat.target}
+                  unit="%"
+                />
+
 
 
               </View>
 
-              {/* Medicine Tracking Section */}
+              {/* Medicine Tracking Section
               <View className="mb-6">
                 <TouchableOpacity 
                   className="bg-white p-6 shadow-lg"
@@ -415,7 +426,7 @@ const HealthTrackerDashboard = () => {
                     </View>
                   </View>
                 </TouchableOpacity>
-              </View>
+              </View> */}
 
               {/* Stress Assessment Section */}
               <View className="mb-6">
