@@ -3,6 +3,7 @@ import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-ico
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, SafeAreaView, FlatList, Alert, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import BASE_URL from "../../../src/config";
 
 interface FoodItem {
   name: string;
@@ -102,7 +103,7 @@ const Food = () => {
       const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
       if (token) {
         const dateKey = formatDateKey(date);
-        const response = await fetch(`http://192.168.1.16:5001/api/food/getfood?date=${dateKey}`, {
+        const response = await fetch(`${BASE_URL}/api/food/getfood?date=${dateKey}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -247,7 +248,7 @@ const Food = () => {
     try {
       const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
       if (token) {
-        const response = await fetch('http://192.168.1.16:5001/api/food/addfood', {
+        const response = await fetch(`${BASE_URL}/api/food/addfood`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

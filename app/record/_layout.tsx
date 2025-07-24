@@ -65,6 +65,34 @@ const _layout = () => {
           title: 'Step Count',
           headerShown: false,
         }}/>
+      <Stack.Screen
+        name="Cardio"
+        options={{
+          title: 'Cardio',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ExerciseTimer"
+        options={{
+          title: 'Exercise Timer',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="AddSugarReading"
+        options={{
+          title: 'Add Sugar Reading',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="SugarHistory"
+        options={{
+          title: 'Sugar History',
+          headerShown: false,
+        }}
+      />
     
     </Stack>
    

@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Medication, MedicationSchedule, DoseLog } from '../models/MedicationModels';
+import BASE_URL from "../../../../src/config";
 
-const API_BASE_URL = 'http://192.168.1.16:5001/api';
+const API_BASE_URL = `${BASE_URL}/api`;
 
 interface ApiResponse<T> {
   success: boolean;

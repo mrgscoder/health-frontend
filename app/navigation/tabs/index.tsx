@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 
+
 const HealthTrackerDashboard = () => {
   const router = useRouter();
   const [currentDate] = useState(new Date());
@@ -18,7 +19,8 @@ const HealthTrackerDashboard = () => {
     heartRate: { current: 72, target: 80 },
     temperature: { current: 98.6, target: 98.6 },
     respiratoryRate: { current: 16, target: 18 },
-    bloodOxygen: { current: 98, target: 100 }
+    bloodOxygen: { current: 98, target: 100 },
+    bloodSugar: { current: 110, target: 140 }
   });
 
   const [userName, setUserName] = useState('');
@@ -43,7 +45,7 @@ const HealthTrackerDashboard = () => {
         }
         
         console.log('🚀 Making API call to profile endpoint...');
-        const response = await fetch('http://192.168.1.16:5001/api/auth/profile', {
+        const response = await fetch('http://192.168.1.54:5001/api/auth/profile', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -155,7 +157,15 @@ const HealthTrackerDashboard = () => {
       return;
     }
     if (itemId === 'medicineTracking') {
-      router.push('/medicine-tracking' as any);
+      router.push('/medicine-tracking');
+      return;
+    }
+    if (itemId === 'cardio') {
+      router.push('/record/Cardio');
+      return;
+    }
+    if (itemId === 'bloodSugar') {
+      router.push('/record/AddSugarReading');
       return;
     }
     // Default selection logic
@@ -326,6 +336,24 @@ const HealthTrackerDashboard = () => {
                   target={goals.bloodOxygen.target}
                   unit="%"
                 />
+                <StatCard
+                  id="cardio"
+                  icon={Activity}
+                  title="Cardio"
+                  current={goals.bloodOxygen.current}
+                  target={goals.bloodOxygen.target}
+                  unit="%"
+                />
+                <StatCard
+                  id="bloodSugar"
+                  icon={Flame}
+                  title="Blood Sugar"
+                  current={goals.bloodSugar.current}
+                  target={goals.bloodSugar.target}
+                  unit=" mg/dL"
+                />
+
+
               </View>
 
               {/* Medicine Tracking Section */}

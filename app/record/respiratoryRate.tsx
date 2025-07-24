@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Dimensions,
 import { LineChart } from 'react-native-chart-kit';
 import { Activity, Calendar, TrendingUp, AlertCircle, Check, Wind } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BASE_URL from "../../src/config";
 
 interface RespiratoryRateRecord {
   id: number;
@@ -40,8 +41,8 @@ const RespiratoryRateTracker = () => {
         return;
       }
 
-      console.log('📡 Making API call to: http://192.168.1.16:5001/api/resp/getrespiratory');
-      const response = await fetch('http://192.168.1.16:5001/api/resp/getrespiratory', {
+      console.log('�� Making API call to:', `${BASE_URL}/api/resp/getrespiratory`);
+      const response = await fetch(`${BASE_URL}/api/resp/getrespiratory`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -119,7 +120,7 @@ const RespiratoryRateTracker = () => {
         return;
       }
 
-      const response = await fetch('http://192.168.1.16:5001/api/resp/addrespiratory', {
+      const response = await fetch(`${BASE_URL}/api/resp/addrespiratory`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

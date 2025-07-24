@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BASE_URL from "../../src/config";
 import { 
   Heart, 
   Activity, 
@@ -25,7 +26,7 @@ import {
   AlertCircle
 } from 'lucide-react-native';
 
-const API_BASE_URL = 'http://192.168.1.16:5001/api/heart'; // Updated API URL
+const API_BASE_URL = `${BASE_URL}/api/heart`; // Updated API URL
 const USER_ID = 1; // Default user ID
 
 // Define the type for heart rate records

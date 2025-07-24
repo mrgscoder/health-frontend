@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import BASE_URL from "../../src/config";
 
 const Account = () => {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ const Account = () => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post('http://192.168.1.16:5001/api/auth/login', {
+      const response = await axios.post(`${BASE_URL}/api/auth/login`, {
         email: email.trim(),
         password: password,
         role: 'user' // Default role
@@ -34,6 +35,9 @@ const Account = () => {
         if (response.data.user) {
           await AsyncStorage.setItem('userFullName', response.data.user.name);
           await AsyncStorage.setItem('userEmail', response.data.user.email);
+          if (response.data.user.user_id) {
+            await AsyncStorage.setItem('userId', response.data.user.user_id.toString());
+          }
         }
         
         Alert.alert('Success', 'Login successful!', [

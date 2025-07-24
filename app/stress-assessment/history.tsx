@@ -5,6 +5,7 @@ import { AssessmentResult } from './utils/storage';
 import { ArrowLeft, Trash2, Calendar, TrendingUp } from 'lucide-react-native';
 import { commonStyles } from './styles/commonStyles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BASE_URL from "../../src/config";
 
 interface APIAssessmentResult {
   id: number;
@@ -40,7 +41,7 @@ export default function HistoryScreen() {
         return;
       }
 
-      const response = await fetch('http://192.168.1.16:5001/api/assessment/getassessment', {
+      const response = await fetch(`${BASE_URL}/api/assessment/getassessment`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

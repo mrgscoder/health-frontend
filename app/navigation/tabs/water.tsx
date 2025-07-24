@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Alert, ScrollView, Dimensions, Image, Swi
 import * as Progress from 'react-native-progress';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import BASE_URL from "../../../src/config";
 
 const { width } = Dimensions.get('window');
 
@@ -94,7 +95,7 @@ const Water = () => {
       // If user is logged in, try to load data from database first
       if (token) {
         try {
-          const response = await fetch('http://192.168.1.16:5001/api/water/today', {
+          const response = await fetch(`${BASE_URL}/api/water/today`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -232,7 +233,7 @@ const Water = () => {
         if (token) {
           try {
                     // Get user's reminder preferences from database
-        const response = await fetch(`http://192.168.1.16:5001/api/water/get-reminder-preferences`, {
+        const response = await fetch(`${BASE_URL}/api/water/get-reminder-preferences`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -274,7 +275,7 @@ const Water = () => {
       // Call API to update reminder preferences in database
       const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
       if (token) {
-        const response = await fetch('http://192.168.1.16:5001/api/water/update-reminder-preferences', {
+        const response = await fetch(`${BASE_URL}/api/water/update-reminder-preferences`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -309,7 +310,7 @@ const Water = () => {
         try {
           const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
           if (token) {
-            const response = await fetch('http://192.168.1.16:5001/api/water/send-reminders', {
+            const response = await fetch(`${BASE_URL}/api/water/send-reminders`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -354,7 +355,7 @@ const Water = () => {
     try {
       const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
       if (token) {
-        const response = await fetch('http://192.168.1.16:5001/api/water/record-water', {
+        const response = await fetch(`${BASE_URL}/api/water/record-water`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -401,7 +402,7 @@ const Water = () => {
     try {
       const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
       if (token) {
-        const response = await fetch('http://192.168.1.16:5001/api/water/record-water', {
+        const response = await fetch(`${BASE_URL}/api/water/record-water`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -635,7 +636,7 @@ const Water = () => {
             try {
               const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
               if (token) {
-                const response = await fetch('http://192.168.1.16:5001/api/water/send-reminders', {
+                const response = await fetch(`${BASE_URL}/api/water/send-reminders`, {
                   method: 'GET',
                   headers: {
                     'Authorization': `Bearer ${token}`,

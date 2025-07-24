@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
+import BASE_URL from "../../../src/config";
 
 // TypeScript types for form data and errors
 interface FormData {
@@ -86,7 +87,7 @@ const SignUpPage = () => {
 
     setIsSendingOtp(true);
     try {
-      const response = await axios.post('http://192.168.1.16:5001/api/auth/send-otp', {
+      const response = await axios.post(`${BASE_URL}/api/auth/send-otp`, {
         email: formData.email,
       });
       if (response.data && response.data.message) {
@@ -115,7 +116,7 @@ const SignUpPage = () => {
     setIsVerifyingCode(true);
     try {
       // Call backend API to verify OTP
-      const response = await axios.post('http://192.168.1.16:5001/api/auth/verify-otp', {
+      const response = await axios.post(`${BASE_URL}/api/auth/verify-otp`, {
         email: formData.email,
         otp: formData.verificationCode,
       });
@@ -155,7 +156,7 @@ const SignUpPage = () => {
     setIsLoading(true);
     try {
       // Call the register API
-      const response = await axios.post('http://192.168.1.16:5001/api/auth/register', {
+      const response = await axios.post(`${BASE_URL}/api/auth/register`, {
         name: userName,
         email: formData.email,
         password: formData.password

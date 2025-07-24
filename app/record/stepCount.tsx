@@ -4,6 +4,7 @@ import { FontAwesome5, MaterialIcons, Ionicons, Feather } from '@expo/vector-ico
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import BASE_URL from "../../src/config";
 
 const THEME_COLOR = '#00b8f1';
 
@@ -85,7 +86,7 @@ const StepCount = () => {
       const miles = distanceMeters * 0.000621371; // Convert meters to miles
       const minutes = Math.floor(stepCount / 100); // Approximate minutes based on steps
 
-      const response = await fetch('http://192.168.1.16:5001/api/step/send', {
+      const response = await fetch(`${BASE_URL}/api/step/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -130,9 +131,9 @@ const StepCount = () => {
         return;
       }
 
-      console.log('Making API request to:', 'http://192.168.1.16:5001/api/step/get');
+      console.log('Making API request to:', `${BASE_URL}/api/step/get`);
       
-      const response = await fetch('http://192.168.1.16:5001/api/step/get', {
+      const response = await fetch(`${BASE_URL}/api/step/get`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

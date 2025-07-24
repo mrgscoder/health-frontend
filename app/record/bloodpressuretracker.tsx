@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-chart-kit';
 import { Calendar, TrendingUp, AlertCircle, Check } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BASE_URL from "../../src/config";
 
 interface BloodPressureRecord {
   id: number;
@@ -41,7 +42,7 @@ const BloodPressureTracker = () => {
           return;
         }
 
-        const response = await fetch('http://192.168.1.16:5001/api/bp/getbp', {
+        const response = await fetch(`${BASE_URL}/api/bp/getbp`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -147,7 +148,7 @@ const BloodPressureTracker = () => {
         return;
       }
 
-      const response = await fetch('http://192.168.1.16:5001/api/bp/addbp', {
+      const response = await fetch(`${BASE_URL}/api/bp/addbp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +164,7 @@ const BloodPressureTracker = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to record blood pressure:', response.status, errorText);
-        console.error('Request URL:', 'http://192.168.1.16:5001/api/bp/addbp');
+        console.error('Request URL:', `${BASE_URL}/api/bp/addbp`);
         console.error('Request body:', JSON.stringify({
           systolic: parseInt(systolic),
           diastolic: parseInt(diastolic),
@@ -215,7 +216,7 @@ const BloodPressureTracker = () => {
         return;
       }
 
-      const response = await fetch('http://192.168.1.16:5001/api/bp/getbp', {
+      const response = await fetch(`${BASE_URL}/api/bp/getbp`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

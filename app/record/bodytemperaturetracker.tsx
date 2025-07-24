@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Dimensions,
 import { LineChart } from 'react-native-chart-kit';
 import { Thermometer, Calendar, TrendingUp, AlertCircle, Check, Activity } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BASE_URL from "../../src/config";
 
 interface TemperatureRecord {
   id: number;
@@ -43,7 +44,7 @@ const TemperatureTracker = () => {
           return;
         }
 
-        const response = await fetch('http://192.168.1.16:5001/api/temp/gettemp', {
+        const response = await fetch(`${BASE_URL}/api/temp/gettemp`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -188,7 +189,7 @@ const TemperatureTracker = () => {
         return;
       }
 
-      const response = await fetch('http://192.168.1.16:5001/api/temp/addtemp', {
+      const response = await fetch(`${BASE_URL}/api/temp/addtemp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -530,7 +531,7 @@ const TemperatureTracker = () => {
                   return;
                 }
 
-                const response = await fetch('http://192.168.1.16:5001/api/temp/gettemp', {
+                const response = await fetch(`${BASE_URL}/api/temp/gettemp`, {
                   method: 'GET',
                   headers: {
                     'Authorization': `Bearer ${token}`,

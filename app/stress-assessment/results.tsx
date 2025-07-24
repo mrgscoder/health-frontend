@@ -5,6 +5,7 @@ import { AssessmentResult } from './utils/storage';
 import { CheckCircle, ArrowLeft, Share2 } from 'lucide-react-native';
 import { commonStyles } from './styles/commonStyles';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BASE_URL from "../../src/config";
 
 export default function ResultsScreen() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function ResultsScreen() {
         return;
       }
 
-      const response = await fetch('http://192.168.1.16:5001/api/assessment/postassessment', {
+      const response = await fetch(`${BASE_URL}/api/assessment/postassessment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

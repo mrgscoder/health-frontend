@@ -15,8 +15,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Bed, Sun, Save, Loader } from 'lucide-react-native';
+import BASE_URL from "../../src/config";
 
-const API_BASE_URL = 'http://192.168.1.16:5001/api/sleep'; // Updated API URL
+const API_BASE_URL = `${BASE_URL}/api/sleep`; // Updated API URL
 
 export default function sleepLogger() {
   const [date, setDate] = useState(new Date());

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { registerForPushNotificationsAsync } from './usePushNotifications';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
+import BASE_URL from "../src/config";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -22,7 +23,7 @@ export default function RootLayout() {
       const token = await registerForPushNotificationsAsync();
       if (token) {
         // Send token to your backend
-        await fetch('http://localhost:5001/api/save-fcm-token', {
+        await fetch(`${BASE_URL}/api/save-fcm-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fcm_token: token, user_id: 1 }),
@@ -100,6 +101,18 @@ export default function RootLayout() {
        headerShown: false,
      }}   
      />
+    <Stack.Screen
+      name="record/Cardio"
+      options={{
+        headerShown: false,
+      }}
+    />
+    <Stack.Screen
+      name="record/ExerciseTimer"
+      options={{
+        headerShown: false,
+      }}
+    />
           
     
       
