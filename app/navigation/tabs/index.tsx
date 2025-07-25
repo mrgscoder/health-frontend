@@ -4,6 +4,7 @@ import { User, Target, Plus, TrendingUp, Calendar, Edit, MoreVertical, Flame, Be
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import BASE_URL from '../../../src/config';
 
 
 const HealthTrackerDashboard = () => {
@@ -46,7 +47,7 @@ const HealthTrackerDashboard = () => {
         }
         
         console.log('🚀 Making API call to profile endpoint...');
-        const response = await fetch('http://192.168.1.54:5001/api/auth/profile', {
+        const response = await fetch(`${BASE_URL}/api/auth/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },

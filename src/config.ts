@@ -1,2 +1,2 @@
-const BASE_URL = "http://192.168.1.54:5001";
+const BASE_URL = process.env.REACT_APP_BASE_URL ;
 export default BASE_URL;

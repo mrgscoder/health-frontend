@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import BASE_URL from '../config';
 
-const MEDICINE_REMINDER_API = `${API_BASE_URL}/medicine-reminders`;
+const MEDICINE_REMINDER_API = `${BASE_URL}/medicine-reminders`;
 
 export const createReminder = async (reminderData) => {
   try {
