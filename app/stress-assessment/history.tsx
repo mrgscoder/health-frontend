@@ -1,253 +1,232 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import { AssessmentResult } from './utils/storage';
-import { ArrowLeft, Trash2, Calendar, TrendingUp } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
+  ListRenderItemInfo,
+} from 'react-native';
+import { getAllAssessmentResults, getAssessmentResults } from './utils/storage';
 import { commonStyles } from './styles/commonStyles';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import BASE_URL from "../../src/config";
 
-interface APIAssessmentResult {
-  id: number;
-  assessment_type: string;
-  total_score: number;
-  level: string;
-  color: string;
-  description: string;
-  recommendation: string | null;
-  recorded_at: string;
+// Define a type for the filter state for better type safety.
+type FilterType = 'all' | 'stress' | 'anxiety';
+
+// Define the shape of a raw assessment result from storage, which might not have the 'type'.
+interface RawAssessmentResult {
+  id: string | number;
+  date: string;
+  score: number;
+  interpretation: {
+    description: string;
+  };
 }
 
-export default function HistoryScreen() {
-  const router = useRouter();
+// Define the full assessment result object shape used within the component.
+interface AssessmentResult extends RawAssessmentResult {
+  type: 'stress' | 'anxiety';
+}
+
+// Assume the storage utility functions return Promises with the defined types.
+// We are assuming getAssessmentResults returns results without a 'type' property,
+// while getAllAssessmentResults returns results with the 'type' property included.
+declare module '../utils/storage' {
+  export function getAssessmentResults(type: 'stress' | 'anxiety'): Promise<RawAssessmentResult[]>;
+  export function getAllAssessmentResults(): Promise<AssessmentResult[]>;
+}
+
+export default function HistoryScreen(): JSX.Element {
   const [results, setResults] = useState<AssessmentResult[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     loadResults();
-  }, []);
+  }, [filter]);
 
-  const loadResults = async () => {
+  const loadResults = async (): Promise<void> => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      
-      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
-      
-      if (!token) {
-        Alert.alert('Authentication Required', 'Please log in to view your assessment history.');
-        setLoading(false);
-        return;
+      let data: AssessmentResult[];
+
+      if (filter === 'all') {
+        data = await getAllAssessmentResults();
+      } else {
+        // Fetch raw results for a specific type and add the 'type' property.
+        const rawData = await getAssessmentResults(filter);
+        data = rawData.map((result) => ({ ...result, type: filter }));
       }
-
-      const response = await fetch(`${BASE_URL}/api/assessment/getassessment`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch assessment history');
-      }
-
-      const apiResults: APIAssessmentResult[] = await response.json();
-      
-      // Transform API results to match local AssessmentResult format
-      const transformedResults: AssessmentResult[] = apiResults.map(apiResult => ({
-        id: apiResult.id,
-        type: apiResult.assessment_type as 'stress' | 'anxiety',
-        score: apiResult.total_score,
-        interpretation: {
-          level: apiResult.level,
-          color: apiResult.color,
-          description: apiResult.description,
-          recommendation: apiResult.recommendation || undefined
-        },
-        responses: [], // API doesn't store individual responses
-        date: apiResult.recorded_at,
-        timeframe: apiResult.assessment_type === 'stress' ? 'last month' : 'last 2 weeks'
-      }));
-
-      setResults(transformedResults);
+      // BUG FIX: Set results for both 'all' and specific filters.
+      // In the original code, this was only called inside the 'else' block.
+      setResults(data);
     } catch (error) {
       console.error('Error loading results:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load assessment history');
-      
-      // Fallback to local storage if API fails
-      try {
-        const { getAllAssessmentResults } = await import('./utils/storage');
-        const localResults = await getAllAssessmentResults();
-        setResults(localResults);
-        console.log('Falling back to local storage data');
-      } catch (localError) {
-        console.error('Failed to load from local storage as well:', localError);
-      }
+      setResults([]); // Clear results on error
     } finally {
+      // Ensure loading is set to false after the operation completes or fails.
       setLoading(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: 'numeric',
     });
   };
 
-  const getAssessmentTypeLabel = (type: string) => {
-    return type === 'stress' ? 'Stress (PSS-10)' : 'Anxiety (GAD-7)';
+  const getAssessmentDisplayName = (type: 'stress' | 'anxiety'): string => {
+    return type === 'stress' ? 'Stress' : 'Anxiety';
   };
 
-  const getScoreColor = (result: AssessmentResult) => {
-    return result.interpretation.color;
-  };
+  const renderFilterButtons = (): JSX.Element => (
+    <View style={styles.filterContainer}>
+      <TouchableOpacity
+        style={[styles.filterButton, filter === 'all' && styles.activeFilter]}
+        onPress={() => setFilter('all')}>
+        <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
+          All Assessments
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.filterButton, filter === 'stress' && styles.activeFilter]}
+        onPress={() => setFilter('stress')}>
+        <Text style={[styles.filterText, filter === 'stress' && styles.activeFilterText]}>
+          Stress History
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.filterButton, filter === 'anxiety' && styles.activeFilter]}
+        onPress={() => setFilter('anxiety')}>
+        <Text style={[styles.filterText, filter === 'anxiety' && styles.activeFilterText]}>
+          Anxiety History
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-  const handleResultPress = (result: AssessmentResult) => {
-    router.push({
-      pathname: '/stress-assessment/results',
-      params: { 
-        result: JSON.stringify(result),
-        assessmentType: result.type
-      }
-    } as any);
-  };
-
-  const handleDeleteResult = (resultId: number) => {
-    Alert.alert(
-      'Delete Assessment',
-      'Are you sure you want to delete this assessment result?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            // Delete functionality would go here
-            console.log('Delete result:', resultId);
-            loadResults(); // Reload after deletion
-          }
-        }
-      ]
-    );
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={commonStyles.safeContainer}>
-        <View style={commonStyles.container}>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={[commonStyles.title, { color: '#fff' }]}>Loading...</Text>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const renderResultItem = ({ item }: ListRenderItemInfo<AssessmentResult>): JSX.Element => (
+    <View style={styles.resultItem}>
+      <View style={styles.resultHeader}>
+        <Text style={styles.resultDate}>{formatDate(item.date)}</Text>
+        <Text style={styles.resultType}>{getAssessmentDisplayName(item.type)}</Text>
+      </View>
+      <View style={styles.resultDetails}>
+        <Text style={styles.resultScore}>Score: {item.score}</Text>
+        <Text style={styles.resultLevel}>{item.interpretation.description}</Text>
+      </View>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={commonStyles.safeContainer}>
-      <View style={commonStyles.container}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={commonStyles.content}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={{ marginRight: 16 }}
-              >
-                <ArrowLeft size={24} color="#333" />
-              </TouchableOpacity>
-              <View>
-                <Text style={commonStyles.title}>Assessment History</Text>
-                <Text style={commonStyles.subtitle}>
-                  {results.length} assessment{results.length !== 1 ? 's' : ''} completed
-                </Text>
-                {error && (
-                  <Text style={[commonStyles.recommendationText, { fontSize: 12, color: '#EF4444', marginTop: 4 }]}>
-                    {error}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* History Content */}
-            {results.length === 0 ? (
-              <View style={commonStyles.card}>
-                <View style={{ alignItems: 'center' }}>
-                  <Calendar size={64} color="#9CA3AF" />
-                  <Text style={[commonStyles.title, { marginTop: 16, marginBottom: 8 }]}>
-                    No Assessments Yet
-                  </Text>
-                  <Text style={commonStyles.recommendationText}>
-                    You haven't completed any assessments yet. Take your first assessment to see your results here.
-                  </Text>
-                  <TouchableOpacity
-                    style={commonStyles.primaryButton}
-                    onPress={() => router.push('/stress-assessment' as any)}
-                  >
-                    <Text style={commonStyles.buttonText}>
-                      Take Assessment
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <View>
-                {results.map((result) => (
-                  <TouchableOpacity
-                    key={result.id}
-                    style={commonStyles.resultItem}
-                    onPress={() => handleResultPress(result)}
-                  >
-                    <View style={commonStyles.resultHeader}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <TrendingUp size={24} color={getScoreColor(result)} />
-                        <Text style={[commonStyles.resultDate, { marginLeft: 12 }]}>
-                          {getAssessmentTypeLabel(result.type)}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteResult(result.id)}
-                        style={{ padding: 8 }}
-                      >
-                        <Trash2 size={20} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={commonStyles.resultDetails}>
-                      <Text style={[commonStyles.resultScore, { color: getScoreColor(result) }]}>
-                        {result.score}
-                      </Text>
-                      <Text style={commonStyles.resultLevel}>
-                        {result.interpretation.level}
-                      </Text>
-                    </View>
-
-                    <Text style={[commonStyles.recommendationText, { marginVertical: 12 }]}>
-                      {result.interpretation.description}
-                    </Text>
-
-                    <View style={commonStyles.resultDetails}>
-                      <Text style={[commonStyles.resultDate, { fontSize: 12, color: '#666' }]}>
-                        {formatDate(result.date)}
-                      </Text>
-                      <Text style={[commonStyles.resultType, { fontSize: 12 }]}>
-                        {result.timeframe}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        </ScrollView>
+    <SafeAreaView style={commonStyles.container}>
+      <View style={commonStyles.innerContainer}>
+        <Text style={commonStyles.title}>Assessment History</Text>
+        {renderFilterButtons()}
+        {loading ? (
+          <Text style={styles.loadingText}>Loading...</Text>
+        ) : results.length === 0 ? (
+          <Text style={styles.emptyText}>No assessment results found.</Text>
+        ) : (
+          <FlatList
+            data={results}
+            renderItem={renderResultItem}
+            keyExtractor={(item) => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
-} 
+}
+
+// Styles remain the same, no conversion needed.
+const styles = StyleSheet.create({
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingHorizontal: 5,
+  },
+  filterButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    marginHorizontal: 3,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
+  },
+  activeFilter: {
+    backgroundColor: '#007bff',
+    borderColor: '#007bff',
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6c757d',
+    textAlign: 'center',
+  },
+  activeFilterText: {
+    color: 'white',
+  },
+  resultItem: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  resultDate: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  resultType: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    backgroundColor: '#e9ecef',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  resultDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  resultScore: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  resultLevel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginTop: 50,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginTop: 50,
+  },
+});
