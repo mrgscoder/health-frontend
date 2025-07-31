@@ -108,8 +108,30 @@ const _layout = () => {
         }}
       />
     
-    </Stack>
-   
+
+    <Stack.Screen
+    name='WorkoutHome'
+    options={{
+      title: 'Workout Home',
+      headerShown: false,
+    }}
+    />
+      
+    <Stack.Screen
+      name="Happiness"
+      options={{
+        title: 'Happiness Assessment',
+        headerShown: false,
+      }}
+    />
+    <Stack.Screen
+      name="Hold"
+      options={{
+        title: 'Breath Hold',
+        headerShown: false,
+      }}
+      />
+     </Stack>
   );
 };
 

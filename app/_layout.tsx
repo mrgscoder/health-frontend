@@ -5,6 +5,11 @@ import { registerForPushNotificationsAsync } from './usePushNotifications';
 import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import BASE_URL from "../src/config";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+// Create a client
+const queryClient = new QueryClient();
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -46,75 +51,91 @@ export default function RootLayout() {
     };
   }, []);
 
-  return <Stack>
-    <Stack.Screen
-      name="health/[id]"
-      options={{
-        headerShown: false,
-      }}
-    />
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <Stack>
+          <Stack.Screen
+            name="health/index"
+            options={{
+              headerShown: false,
+            }}
+          />
 
-    <Stack.Screen
-      name="navigation/tabs"
-      options={{
-        headerShown: false,
-      }}
-    />
-      <Stack.Screen
-      name="health/Account"
-      options={{
-        headerShown: false,
-      }}
-    />
-     <Stack.Screen
-      name="health/forms"
-      options={{
-        headerShown: false,
-      }}
-    />
-    <Stack.Screen
-      name="health/forgot"
-      options={{
-        headerShown: false,
-      }}
-    />
-    <Stack.Screen
-      name="record"
-      options={{
-        headerShown: false,
-      }}/>
-      <Stack.Screen
-      name="stress-assessment"
-      options={{
-        headerShown: false,
-      }}
-    />
-    <Stack.Screen
-      name="health/medication"
-      options={{
-        headerShown: false,
-      }}
-      />
-    <Stack.Screen
-     name="medicine-tracking"
-     options={{ 
-       headerShown: false,
-     }}   
-     />
-    <Stack.Screen
-      name="record/Cardio"
-      options={{
-        headerShown: false,
-      }}
-    />
-    <Stack.Screen
-      name="record/ExerciseTimer"
-      options={{
-        headerShown: false,
-      }}
-    />
-          
-    
-      
-  </Stack>;
+          <Stack.Screen
+            name="navigation/tabs"
+            options={{
+              headerShown: false,
+            }}
+          />
+            <Stack.Screen
+            name="health/Account"
+            options={{
+              headerShown: false,
+            }}
+          />
+           <Stack.Screen
+            name="health/forms"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="health/forgot"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="record"
+            options={{
+              headerShown: false,
+            }}/>
+            <Stack.Screen
+            name="stress-assessment"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="health/medication"
+            options={{
+              headerShown: false,
+            }}
+            />
+          <Stack.Screen
+           name="medicine-tracking"
+           options={{ 
+             headerShown: false,
+           }}   
+           />
+          <Stack.Screen
+            name="record/Cardio"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="record/ExerciseTimer"
+            options={{
+              headerShown: false,
+            }}
+          />
+
+          <Stack.Screen
+            name="health/medicine"
+            options={{
+              headerShown: false,
+            }}
+            />
+          <Stack.Screen
+            name="health/profile"
+            options={{
+              headerShown: false,
+            }}
+            />
+        </Stack>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
+  );
 }

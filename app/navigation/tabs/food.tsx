@@ -3,6 +3,7 @@ import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-ico
 import { View, Text, TouchableOpacity, TextInput, ScrollView, Modal, SafeAreaView, FlatList, Alert, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import BASE_URL from "../../../src/config";
 
 interface FoodItem {
@@ -524,19 +525,25 @@ const Food = () => {
   const currentFoodData = getCurrentFoodData();
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView 
-        className="flex-1" 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#11B5CF']}
-            tintColor="#11B5CF"
-          />
-        }
-      >
+    <LinearGradient
+      colors={['#CFF4D2', '#FFD6A5']}
+      style={{ flex: 1 }}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <SafeAreaView className="flex-1">
+        <ScrollView 
+          className="flex-1" 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#11B5CF']}
+              tintColor="#11B5CF"
+            />
+          }
+        >
         {/* Header */}
         <View className="bg-white px-4 py-6 shadow-sm">
           <View className="items-center">
@@ -674,7 +681,8 @@ const Food = () => {
         </View>
 
 
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
 
       {/* Calendar Modal */}
       <CalendarModal />
@@ -799,7 +807,7 @@ const Food = () => {
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </LinearGradient>
   );
 };
 

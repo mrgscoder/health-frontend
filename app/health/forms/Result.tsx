@@ -3,6 +3,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { View, Text, Button, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as Progress from 'react-native-progress';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 // Define props interface for user data
 interface ResultParams {
@@ -14,6 +16,8 @@ interface ResultParams {
   stressLevel: 'Low' | 'Moderate' | 'High';
   healthGoal: string;
   name?: string;
+  age?: string;
+  gender?: 'Male' | 'Female';
 }
 
 interface ResultProps {
@@ -63,6 +67,8 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
     stressLevel,
     healthGoal,
     name = '',
+    age = '',
+    gender = 'Male', // Default to Male if not provided
   } = params as Partial<ResultParams>;
 
   // Debug: Log what data we're receiving
@@ -77,7 +83,9 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
     sleepHours,
     dietPreference,
     stressLevel,
-    healthGoal
+    healthGoal,
+    age,
+    gender
   });
 
   // Use name from params, then AsyncStorage, then default
@@ -90,7 +98,6 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
   } else if (routeHeight) {
     height = typeof routeHeight === 'string' ? parseFloat(routeHeight) : routeHeight;
   } else {
-    // Only use fallback if no data is provided at all
     height = 170;
   }
 
@@ -100,7 +107,6 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
   } else if (routeWeight) {
     weightKg = typeof routeWeight === 'string' ? parseFloat(routeWeight) : routeWeight;
   } else {
-    // Only use fallback if no data is provided at all
     weightKg = 70;
   }
 
@@ -110,41 +116,104 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
   // Calculate BMI using actual user data
   const bmiValue = (weightKg / ((height / 100) ** 2));
   const bmi = bmiValue.toFixed(1);
-  const bmiCategory = bmiValue < 18.5 ? 'Underweight' : bmiValue < 25 ? 'Healthy' : bmiValue < 30 ? 'Overweight' : 'Obese';
 
-  // Calculate Health Score using actual user data
+  // Gender-specific BMI categories
+  const bmiCategory = gender === 'Male'
+    ? bmiValue < 18.5 ? 'Underweight' : bmiValue < 25 ? 'Healthy' : bmiValue < 30 ? 'Overweight' : 'Obese'
+    : bmiValue < 18.5 ? 'Underweight' : bmiValue < 24 ? 'Healthy' : bmiValue < 29 ? 'Overweight' : 'Obese';
+
+  // Enhanced Health Score Calculation with Gender Adjustment
   const activityScore: Record<string, number> = {
     'Sedentary': 5,
-    'Lightly Active': 10,
-    'Moderately Active': 20,
-    'Very Active': 25,
+    'Lightly Active': 15,
+    'Moderately Active': 25,
+    'Very Active': 35,
   };
   
-  const activityScoreValue = activityLevel ? activityScore[activityLevel] || 10 : 10;
-  const sleepScore = sleepHoursNum >= 7 && sleepHoursNum <= 8 ? 25 : sleepHoursNum < 5 ? 10 : 15;
-  const dietScore = dietPreference ? 20 : 10; // Simplified
-  const stressScore = stressLevel === 'Low' ? 25 : stressLevel === 'Moderate' ? 15 : 10;
-  const healthScore = activityScoreValue + sleepScore + dietScore + stressScore;
+  const activityScoreValue = activityLevel ? activityScore[activityLevel] || 15 : 15;
+  const sleepScore = sleepHoursNum >= 7 && sleepHoursNum <= 8 ? 30 : sleepHoursNum < 5 ? 10 : 20;
+  const dietScore = dietPreference ? (dietPreference.includes('Vegan') || dietPreference.includes('Vegetarian') ? 25 : 20) : 15;
+  const stressScore = stressLevel === 'Low' ? 30 : stressLevel === 'Moderate' ? 20 : 10;
+  
+  // Gender-specific adjustment: females may need slightly higher protein and activity focus for muscle maintenance
+  const genderAdjustment = gender === 'Female' ? 5 : 0; // Add 5 points for females to account for higher protein needs
+  const healthScore = Math.round((activityScoreValue + sleepScore + dietScore + stressScore + genderAdjustment) * 0.588); // Scale to 0-100
 
-  // Recommendations using actual user data
-  const activityRecommendation = activityLevel === 'Sedentary'
-    ? 'Try 20 min of brisk walking daily to boost heart health!'
-    : `Great job staying ${activityLevel?.toLowerCase()}! Add a 7-min workout to level up.`;
-  
-  const dietRecommendation = `For your ${dietPreference || 'Balanced'} diet and ${healthGoal || 'General Wellness'} goal, try ${healthGoal === 'Weight Loss' ? 'high-protein, low-calorie meals' : 'balanced, nutrient-rich foods'}.`;
-  
+  // Health Score Categories
+  const getHealthScoreCategory = (score: number): { category: string; description: string } => {
+    if (score >= 80) {
+      return {
+        category: 'Excellent',
+        description: 'You’re thriving! Your lifestyle choices are top-notch. Keep pushing for consistency.'
+      };
+    } else if (score >= 60) {
+      return {
+        category: 'Good',
+        description: 'You’re on a solid path! Small tweaks can elevate your health to the next level.'
+      };
+    } else if (score >= 40) {
+      return {
+        category: 'Fair',
+        description: 'You’ve got a foundation to build on. Focus on key areas to boost your score.'
+      };
+    } else {
+      return {
+        category: 'Needs Improvement',
+        description: 'Time for a health reset! Start with small, sustainable changes to see progress.'
+      };
+    }
+  };
+
+  const { category: healthScoreCategory, description: healthScoreDescription } = getHealthScoreCategory(healthScore);
+
+  // Enhanced Recommendations with Indian-Specific Protein Sources and Gender Adjustment
+  const activityRecommendation = gender === 'Female'
+    ? (activityLevel === 'Sedentary'
+        ? 'Start with 20 min of brisk walking or yoga daily to boost heart health and muscle tone.'
+        : `Great job staying ${activityLevel?.toLowerCase()}! Add a 10-min strength workout to support bone health.`)
+    : (activityLevel === 'Sedentary'
+        ? 'Start with 20 min of brisk walking daily to boost heart health and energy levels.'
+        : `Great job staying ${activityLevel?.toLowerCase()}! Add a 10-min bodyweight workout to enhance strength.`);
+
+  const proteinSources = {
+    Vegetarian: ['paneer', 'chickpeas (chole)', 'lentils (dal)', 'rajma (kidney beans)', 'dahi (yogurt)'],
+    Vegan: ['tofu', 'chickpeas (chole)', 'lentils (dal)', 'rajma (kidney beans)', 'soy milk'],
+    NonVegetarian: ['eggs', 'chicken', 'fish (machhli)', 'mutton', 'prawns']
+  };
+
+  const selectedDiet = dietPreference?.includes('Vegan') ? 'Vegan' :
+                      dietPreference?.includes('Vegetarian') ? 'Vegetarian' : 'NonVegetarian';
+
+  // Gender-specific protein needs: Females 1.0-1.4g/kg, Males 0.8-1.2g/kg
+  const proteinRange = gender === 'Female' ? '1.0-1.4g' : '0.8-1.2g';
+  const proteinRecommendation = `Incorporate protein-rich foods like ${proteinSources[selectedDiet].slice(0, 3).join(', ')} into your ${dietPreference || 'Balanced'} diet to support ${healthGoal || 'General Wellness'}. Aim for ${proteinRange} of protein per kg of body weight daily. Try recipes like ${selectedDiet === 'Vegan' ? 'dal tadka or tofu bhurji' : selectedDiet === 'Vegetarian' ? 'paneer tikka or chana masala' : 'chicken curry or fish fry'}.`;
+
+  const dietRecommendation = `${proteinRecommendation} For ${healthGoal || 'General Wellness'}, include ${healthGoal === 'Weight Loss' ? 'high-protein, low-calorie meals like dal with roti' : healthGoal === 'Gain Muscle' ? 'protein-heavy meals with complex carbs like paneer paratha' : 'balanced meals with whole grains like brown rice and dal'}.`;
+
   const sleepRecommendation = sleepHoursNum < 6
-    ? 'Aim for 7-8 hours of sleep with a consistent bedtime routine.'
-    : 'Great sleep habits! Keep it up for better energy.';
-  
+    ? 'Aim for 7-8 hours of sleep with a consistent bedtime routine to improve recovery.'
+    : 'Excellent sleep habits! Maintain this for optimal energy and focus.';
+
   const stressRecommendation = stressLevel === 'High'
-    ? 'Try 5-minute mindfulness exercises to reduce stress.'
-    : 'Keep stress in check with deep breathing or yoga.';
-  
+    ? 'Practice 5-minute mindfulness or meditation daily to reduce stress and improve focus.'
+    : 'Keep stress in check with deep breathing exercises or a short yoga session.';
+
+  // Motivational Quotes
+  const motivationalQuotes = [
+    "Small steps every day lead to big results!",
+    "Your health is an investment, not an expense.",
+    "Progress, not perfection, is the key to success.",
+    "Every healthy choice you make is a victory!",
+    "You’re stronger than you think—keep going!"
+  ];
+
+  const randomQuote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+
+  // Enhanced Health Roadmap with Indian Context and Gender Adjustment
   const roadmap = [
-    `Step 1: ${(healthGoal || 'General Wellness') === 'Weight Loss' ? 'Walk 10,000 steps daily' : 'Set a daily health goal'}.`,
-    `Step 2: Try a ${(healthGoal || 'General Wellness') === 'Weight Loss' ? '7-min workout' : 'mindfulness session'}.`,
-    'Step 3: Track progress in the app!',
+    `Step 1: ${(healthGoal || 'General Wellness') === 'Weight Loss' ? 'Walk 10,000 steps daily' : healthGoal === 'Gain Muscle' ? 'Start a strength training routine 3x/week' : 'Set a daily health goal'}.`,
+    `Step 2: Include ${proteinSources[selectedDiet][0]} in at least one meal daily, like ${selectedDiet === 'Vegan' ? 'dal with rice' : selectedDiet === 'Vegetarian' ? 'paneer sabzi' : 'chicken curry'}.`,
+    `Step 3: Track your ${healthGoal?.toLowerCase() || 'health'} progress in the app!`,
   ];
 
   // Initialize router from expo-router for navigation
@@ -153,11 +222,43 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
   // Navigate to the signup screen when the CTA button is pressed
   const handleNavigateSignup = () => {
     try {
-      // Navigate to the signup form
-      router.push('/health/forms/Signup');
+      // Prepare all health data to pass to signup
+      const healthData = {
+        name: displayName,
+        age: params.age as string,
+        height: height.toString(),
+        weight: weightKg.toString(),
+        activityLevel: activityLevel || '',
+        sleepHours: sleepHoursNum.toString(),
+        dietPreference: dietPreference || '',
+        stressLevel: stressLevel || '',
+        healthGoal: healthGoal || '',
+        gender: gender,
+        bmi: bmi,
+        bmiCategory: bmiCategory,
+        healthScore: healthScore.toString(),
+        healthScoreCategory,
+        activityRecommendation,
+        dietRecommendation,
+        sleepRecommendation,
+        stressRecommendation,
+        roadmap: JSON.stringify(roadmap),
+        motivationalQuote: randomQuote
+      };
+
+      // Create URL with all health data as query parameters
+      const queryParams = new URLSearchParams(healthData).toString();
+      
+      console.log('✅ Result.tsx - Navigating to signup with health data:', healthData);
+      console.log('📊 All params received:', params);
+      console.log('👤 Display name:', displayName);
+      
+      router.push({
+        pathname: '/health/forms/Signup',
+        params: healthData
+      });
     } catch (error) {
-      console.error('Navigation error:', error);
-      // Fallback to tabs if signup navigation fails
+      console.error('❌ Navigation error:', error);
       router.push('/navigation/tabs');
     }
   };
@@ -171,102 +272,150 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-cyan-50">
-      <ScrollView className="p-8">
-        {/* Header */}
-        <Text className="text-3xl font-semibold text-[#11B5CF] mb-1 mt-15">
-          Hi, {displayName}!
-        </Text>
-        <Text className="text-lg  text-gray-500 mb-6">
-          Here is your Health Snapshot
-        </Text>
-
-        {/* BMI Section */}
-        <View className="bg-white p-4 rounded-lg shadow-md mb-4">
-          <Text className="text-md font-semibold text-black">Body Mass Index (BMI)</Text>
-          <Text className="text-sm text-gray-500 mt-2">{bmi} - {bmiCategory}</Text>
-          <View className="mt-4">
-            <Progress.Bar
-              progress={Math.min(parseFloat(bmi) / 40, 1)} // Normalize BMI to 0-1 for progress bar
-              width={null}
-              color={bmiCategory === 'Healthy' ? '#dffd6e' : '#ef4444'}
-              unfilledColor="#e5e7eb"
-              borderWidth={0}
-              height={10}
-              className="rounded-full"
-            />
-            <Text className="text-xs text-gray-600 mt-2">
-              {bmiCategory === 'Healthy'
-                ? 'You\'re in a healthy range! Keep it up.'
-                : `Let's work on getting to a healthier BMI with ${healthGoal?.toLowerCase()} tips!`}
+    <LinearGradient
+      colors={[
+        '#11B5CF',
+        '#0EA5BF',
+        '#0B95AF',
+        '#08859F',
+        '#05758F',
+        '#02657F',
+        '#01556F',
+        '#00455F',
+        '#00354F',
+        '#00253F',
+      ]}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView className="flex-1">
+        <ScrollView className="flex-1 p-5">
+          {/* White rounded container for the health snapshot */}
+          <View className="bg-white rounded-3xl p-6 shadow-lg mb-12" style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 12,
+            elevation: 8,
+            borderRadius: 24,
+          }}>
+            {/* Header */}
+            <Text className="text-2xl font-semibold text-[#11B5CF] mb-1">
+              Hi, {displayName}!
             </Text>
-          </View>
-        </View>
-
-        {/* Health Score Section */}
-        <View className="bg-white p-4 rounded-xl shadow-md mb-4">
-          <Text className="text-md font-semibold text-gray-800">Health Score</Text>
-          <View className="items-center mt-4">
-           <Progress.Circle
-            size={120}
-            progress={healthScore / 100}
-            showsText
-            color="#daf66e"
-            textStyle={{ fontSize: 24, fontWeight: 'bold' }}
-            thickness={10}
-            formatText={() => `${healthScore}%`}
-          />
-            <Text className="text-sm font-bold text-gray-500 mt-2">
-              Your score: {healthScore}/100
+            <Text className="text-sm text-gray-500 mb-6">
+              Your Personalized Health Snapshot
             </Text>
-            <Text className="text-xs text-gray-600 mt-2">
-              Based on your activity, sleep, diet, and stress. Create an account to track improvements!
-            </Text>
-          </View>
-        </View>
 
-        {/* Recommendations Section */}
-        <View className="bg-white p-4 rounded-lg shadow-md mb-4">
-          <Text className="text-md font-semibold text-gray-800 ">Your Personalized Recommendations</Text>
-          <Text className="text-md font-medium text-[#11B5CF] mt-4">Activity</Text>
-          <Text className="text-sm text-gray-600">{activityRecommendation}</Text>
-          <Text className="text-md font-medium text-[#11B5CF] mt-4">Diet</Text>
-          <Text className="text-sm text-gray-600">{dietRecommendation}</Text>
-          <Text className="text-md font-medium text-[#11B5CF] mt-4">Sleep</Text>
-          <Text className="text-sm text-gray-600">{sleepRecommendation}</Text>
-          <Text className="text-md font-medium text-[#11B5CF] mt-4">Stress</Text>
-          <Text className="text-sm text-gray-600">{stressRecommendation}</Text>
-        </View>
-
-        {/* Health Roadmap Section */}
-        <View className="bg-white p-4 rounded-lg shadow-md mb-4">
-          <Text className="text-md font-semibold text-gray-800">Your Health Roadmap</Text>
-          {roadmap.map((step, index) => (
-            <Text key={index} className="text-sm text-gray-600 mt-2">
-              • {step}
-            </Text>
-          ))}
-        </View>
-
-        {/* Call to Action */}
-        <View className="bg-[#11B5CF] p-4 rounded-lg mb-6">
-          <Text className="text-white text-center text-sm font-semibold">
-            Save your progress and unlock personalized plans!
-          </Text>
-          <View className="mt-4 ">
-            <TouchableOpacity
-              style={{ backgroundColor: '#dffd6e', borderRadius: 8, paddingVertical: 12 }}
-              activeOpacity={0.8}
-              onPress={handleNavigateSignup}
-            >
-              <Text className="text-center text-md font-bold" style={{ color: 'black' }}>
-                Create Your Account
+            {/* Motivational Quote */}
+            <View className="bg-white p-4 rounded-lg shadow-md mb-4">
+              <Text className="text-md font-semibold text-black italic text-center">
+                "{randomQuote}"
               </Text>
-            </TouchableOpacity>
+            </View>
+
+            {/* BMI Section */}
+            <View className="bg-gray-50 p-4 rounded-lg shadow-md mb-4">
+              <Text className="text-md font-semibold text-gray-800">Body Mass Index (BMI)</Text>
+              <Text className="text-sm text-gray-500 mt-2">{bmi} - {bmiCategory}</Text>
+              <View className="mt-4">
+                <Progress.Bar
+                  progress={Math.min(parseFloat(bmi) / 40, 1)}
+                  width={null}
+                  color={bmiCategory === 'Healthy' ? '#dffd6e' : '#ef4444'}
+                  unfilledColor="#e5e7eb"
+                  borderWidth={0}
+                  height={10}
+                  className="rounded-full"
+                />
+                <Text className="text-xs text-gray-600 mt-2">
+                  {bmiCategory === 'Healthy'
+                    ? `You're in a healthy range for ${gender === 'Male' ? 'men' : 'women'}! Maintain with balanced nutrition and exercise.`
+                    : `Let's optimize your BMI with tailored ${healthGoal?.toLowerCase()} strategies for ${gender === 'Male' ? 'men' : 'women'}!`}
+                </Text>
+              </View>
+            </View>
+
+            {/* Health Score Section */}
+            <View className="bg-gray-50 p-4 rounded-xl shadow-md mb-4">
+              <Text className="text-md font-semibold text-gray-800">Health Score: {healthScoreCategory}</Text>
+              <View className="items-center mt-4">
+                <Progress.Circle
+                  size={120}
+                  progress={healthScore / 100}
+                  showsText
+                  color="#daf66e"
+                  textStyle={{ fontSize: 24, fontWeight: 'bold' }}
+                  thickness={10}
+                  formatText={() => `${healthScore}%`}
+                />
+                <Text className="text-sm font-bold text-gray-500 mt-2">
+                  Your score: {healthScore}/100
+                </Text>
+                <Text className="text-xs text-gray-600 mt-2 text-center">
+                  {healthScoreDescription}
+                </Text>
+              </View>
+            </View>
+
+            {/* Recommendations Section */}
+            <View className="p-6 rounded-3xl mb-6" style={{
+              borderWidth: 2,
+              borderColor: '#11B5CF',
+              borderStyle: 'dashed',
+            }}>
+              <Text className="text-lg font-bold font-serif text-center text-[#11B5CF] mb-4 mt-6">
+               Recommendations
+              </Text>
+              
+              {/* Activity Recommendation */}
+              <View className="p-4 mb-4 rounded-3xl">
+                <View className="flex-row items-center mb-2 ">
+                  <Ionicons name="fitness-outline" size={24} color="#11B5CF" style={{ marginRight: 8 }} />
+                  <Text className="text-lg font-bold text-[#11B5CF]">Activity</Text>
+                </View>
+                <Text className="text-sm text-gray-700 leading-6">{activityRecommendation}</Text>
+              </View>
+
+              {/* Diet Recommendation */}
+              <View className="p-4 mb-4">
+                <View className="flex-row items-center mb-2">
+                  <Ionicons name="restaurant-outline" size={24} color="#11B5CF" style={{ marginRight: 8 }} />
+                  <Text className="text-lg font-bold text-[#11B5CF]">Diet</Text>
+                </View>
+                <Text className="text-sm text-gray-700 leading-6">{dietRecommendation}</Text>
+              </View>
+
+              {/* Sleep Recommendation */}
+              <View className="p-4">
+                <View className="flex-row items-center mb-2">
+                  <Ionicons name="moon-outline" size={24} color="#11B5CF" style={{ marginRight: 8 }} />
+                  <Text className="text-lg font-bold text-[#11B5CF]">Sleep</Text>
+                </View>
+                <Text className="text-sm text-gray-700 leading-6">{sleepRecommendation}</Text>
+              </View>
+            </View>
+
+            {/* Call to Action */}
+            <View className="bg-[#11B5CF] p-4 rounded-lg mb-6">
+              <Text className="text-white text-center text-sm font-semibold">
+                Save your progress and unlock personalized plans!
+              </Text>
+              <View className="mt-4">
+                <TouchableOpacity
+                  style={{ backgroundColor: '#dffd6e', borderRadius: 8, paddingVertical: 12 }}
+                  activeOpacity={0.8}
+                  onPress={handleNavigateSignup}
+                >
+                  <Text className="text-center text-md font-bold" style={{ color: 'black' }}>
+                    Create Your Account
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 

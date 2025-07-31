@@ -2,31 +2,32 @@ import { Feather, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import BASE_URL from "../../../src/config";
+import { saveUserHealthData, HealthData } from "../../utils/authUtils";
 
 // TypeScript types for form data and errors
 interface FormData {
   email: string;
-  gender: 'Male' | 'Female' | 'Other' | '';
   password: string;
   verificationCode: string;
 }
 interface FormErrors {
   email?: string;
-  gender?: string;
   password?: string;
   verificationCode?: string;
 }
+
+
 
 const SignUpPage = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [formData, setFormData] = useState<FormData>({
     email: '',
-    gender: '',
     password: '',
     verificationCode: '',
   });
@@ -39,30 +40,51 @@ const SignUpPage = () => {
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [codeVerified, setCodeVerified] = useState(false);
   const [userName, setUserName] = useState<string>('');
+  const [healthData, setHealthData] = useState<HealthData>(() => {
+    // Initialize health data directly from params
+    const extractedHealthData = {
+      name: params.name as string,
+      age: params.age as string,
+      gender: params.gender as string,
+      height: params.height as string,
+      weight: params.weight as string,
 
-  // Get name from params or AsyncStorage
-  useEffect(() => {
-    const getName = async () => {
-      try {
-        // First try to get name from route params
-        const nameFromParams = params.name as string;
-        if (nameFromParams) {
-          setUserName(nameFromParams);
-          return;
-        }
-        
-        // Fallback to AsyncStorage
-        const storedName = await AsyncStorage.getItem('userFullName');
+      activityLevel: params.activityLevel as string,
+      sleepHours: params.sleepHours as string,
+      dietPreference: params.dietPreference as string,
+      stressLevel: params.stressLevel as string,
+      healthGoal: params.healthGoal as string,
+      bmi: params.bmi as string,
+      bmiCategory: params.bmiCategory as string,
+      healthScore: params.healthScore as string,
+      activityRecommendation: params.activityRecommendation as string,
+      dietRecommendation: params.dietRecommendation as string,
+      sleepRecommendation: params.sleepRecommendation as string,
+      stressRecommendation: params.stressRecommendation as string,
+      roadmap: params.roadmap as string,
+    };
+
+    // Set user name from health data
+    if (extractedHealthData.name) {
+      setUserName(extractedHealthData.name);
+    } else {
+      // Try to get from AsyncStorage asynchronously
+      AsyncStorage.getItem('userFullName').then(storedName => {
         if (storedName) {
           setUserName(storedName);
         }
-      } catch (error) {
-        console.log('Error getting name:', error);
-      }
-    };
+      });
+    }
+
+
+
+    console.log('✅ Signup.tsx - Initialized health data:', extractedHealthData);
+    console.log('📊 All params received:', params);
+    console.log('👤 User name set to:', extractedHealthData.name);
+
     
-    getName();
-  }, [params.name]);
+    return extractedHealthData;
+  });
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -155,27 +177,66 @@ const SignUpPage = () => {
     if (!validateForm()) return;
     setIsLoading(true);
     try {
-      // Call the register API
-      const response = await axios.post(`${BASE_URL}/api/auth/register`, {
+      // Step 1: Call the register API with health data
+      const registerData = {
         name: userName,
         email: formData.email,
         password: formData.password
-      });
+      };
 
-      if (response.status === 201) {
-        // Save user's full name and gender to AsyncStorage
+      // Add health data if available
+      console.log('🔍 Health data available:', healthData);
+      console.log('🔍 Health data keys:', Object.keys(healthData));
+      console.log('🔍 Health data name:', healthData.name);
+      
+      if (Object.keys(healthData).length > 0 && healthData.name) {
+        console.log('✅ Adding health data to registration request');
+        Object.assign(registerData, {
+          age: healthData.age,
+          gender: healthData.gender,
+          height: healthData.height,
+          weight: healthData.weight,
+          bmi: healthData.bmi,
+          activityLevel: healthData.activityLevel,
+          sleepHours: healthData.sleepHours,
+          dietPreference: healthData.dietPreference,
+          healthGoal: healthData.healthGoal,
+          stressLevel: healthData.stressLevel,
+          healthScore: healthData.healthScore
+        });
+      } else {
+        console.log('❌ Health data not available or incomplete');
+      }
+      
+      console.log('📤 Final registration data:', registerData);
+
+      const registerResponse = await axios.post(`${BASE_URL}/api/auth/register`, registerData);
+
+      if (registerResponse.status === 201) {
+        const user = registerResponse.data.user;
+        const userId = user.user_id;
+
+        // Save user's full name to AsyncStorage
         await AsyncStorage.setItem('userFullName', userName);
-        await AsyncStorage.setItem('userGender', formData.gender);
         
-        // If the API returns a token, save it
-        if (response.data.token) {
-          await AsyncStorage.setItem('userToken', response.data.token);
+        // Save all health data to AsyncStorage
+        if (Object.keys(healthData).length > 0) {
+          await saveUserHealthData(healthData);
         }
         
-        // Navigate to the main app
-        router.push('/health/Account');
+        // If the API returns a token, save it
+        if (registerResponse.data.token) {
+          await AsyncStorage.setItem('userToken', registerResponse.data.token);
+          await AsyncStorage.setItem('token', registerResponse.data.token);
+        }
+        
+        // Health data is now saved during registration process
+        console.log('Health data included in registration request');
+        
+        // Navigate directly to main app without showing success alert
+        router.push('/navigation/tabs');
       } else {
-        alert('Registration failed: ' + (response.data?.message || 'Unknown error'));
+        alert('Registration failed: ' + (registerResponse.data?.message || 'Unknown error'));
       }
     } catch (error: any) {
       const errorMessage = error?.response?.data?.message || 
@@ -188,24 +249,38 @@ const SignUpPage = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-100">
-      <ScrollView
-        className="flex-1 p-6"
-        contentContainerStyle={{ justifyContent: 'center', flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="bg-white rounded-3xl p-6 shadow-lg w-full max-w-sm self-center">
+    <LinearGradient
+      colors={[
+        '#11B5CF',
+        '#0EA5BF',
+        '#0B95AF',
+        '#08859F',
+        '#05758F',
+        '#02657F',
+        '#01556F',
+        '#00455F',
+        '#00354F',
+        '#00253F',
+      ]}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView className="flex-1">
+        <ScrollView
+          className="flex-1 p-6"
+          contentContainerStyle={{ justifyContent: 'center', flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="bg-white rounded-3xl p-6 shadow-lg w-full max-w-sm self-center" style={{
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 12,
+            elevation: 8,
+          }}>
           <Text className="text-2xl font-bold text-gray-800 mb-2 text-center">Create Account</Text>
           <Text className="text-base text-xs text-gray-500 mb-6 text-center">Join us and start your journey today!</Text>
 
-          {/* Display User Name */}
-          {userName && (
-            <View className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 mb-3">
-              <Text className="text-green-800 text-sm font-medium text-center">
-                Welcome, {userName}! Your health assessment is complete.
-              </Text>
-            </View>
-          )}
+
 
           {/* Email */}
           <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'email' ? 'border-[#11B5CF]' : 'border-gray-200'}`}>
@@ -226,7 +301,7 @@ const SignUpPage = () => {
           {/* Send OTP Button */}
           <TouchableOpacity
             className={`h-12 rounded-2xl items-center justify-center mb-3 w-full shadow-lg ${
-              otpSent ? 'bg-green-500' : 'bg-[#11B5CF]'
+              otpSent ? 'bg-[#daf66e]' : 'bg-[#11B5CF]'
             }`}
             onPress={handleSendOtp}
             disabled={isSendingOtp || otpSent}
@@ -269,7 +344,7 @@ const SignUpPage = () => {
               {/* Verify Code Button */}
               <TouchableOpacity
                 className={`h-12 rounded-2xl items-center justify-center mb-3 w-full shadow-lg ${
-                  codeVerified ? 'bg-green-500' : 'bg-[#11B5CF]'
+                  codeVerified ? 'bg-[#daf66e]' : 'bg-[#11B5CF]'
                 }`}
                 onPress={handleVerifyCode}
                 disabled={isVerifyingCode || codeVerified}
@@ -288,29 +363,7 @@ const SignUpPage = () => {
             </>
           )}
 
-          {/* Gender Selection */}
-          <View className="mb-3">
-            <Text className="font-semibold text-gray-700 mb-2">Gender</Text>
-            <View className="flex-row gap-4">
-              {['Male', 'Female', 'Other'].map(option => (
-                <TouchableOpacity
-                  key={option}
-                  className="flex-row items-center mr-4"
-                  onPress={() => handleInputChange('gender', option)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: formData.gender === option }}
-                >
-                  <View className="h-5 w-5 rounded-full border-2 border-[#11B5CF] items-center justify-center mr-1.5">
-                    {formData.gender === option && (
-                      <View className="h-2.5 w-2.5 rounded-full bg-[#11B5CF]" />
-                    )}
-                  </View>
-                  <Text className="text-gray-700 font-medium">{option}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {errors.gender ? <Text className="text-red-500 text-sm font-medium mb-2 ml-2 self-start">{errors.gender}</Text> : null}
-          </View>
+
 
           {/* Password */}
           <View className={`flex-row items-center border-2 rounded-2xl bg-white h-14 px-4 mb-3 ${focusedField === 'password' ? 'border-[#11B5CF]' : 'border-gray-200'}`}>
@@ -329,21 +382,18 @@ const SignUpPage = () => {
 
           {/* Create Account Button */}
           <TouchableOpacity 
-            className="bg-[#11B5CF] h-14 rounded-2xl items-center justify-center mt-4 w-full shadow-lg" 
+            className="bg-[#11B5CF] h-14 rounded-2xl items-center justify-center mt-4 mb-4 w-full shadow-lg" 
             onPress={handleSignUp} 
             disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text className="text-white text-lg font-semibold">Create Account</Text>
+              <Text className="text-white text-lg font-semibold">Sign Up</Text>
             )}
           </TouchableOpacity>
 
-          {/* Check Image */}
-          <View className="items-center mb-4">
-            <Image source={require('../../../assets/images/heart.jpg')} className="w-48 h-48" />
-          </View>
+
 
           {/* Motivating Quote */}
           <View className="items-center mb-6">
@@ -364,9 +414,10 @@ const SignUpPage = () => {
               <Text className="text-[#11B5CF] font-semibold" onPress={() => router.push('/health/Account')}>Sign In</Text>
             </Text>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+                  </View>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 

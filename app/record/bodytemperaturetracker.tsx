@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Dimensions,
 import { LineChart } from 'react-native-chart-kit';
 import { Thermometer, Calendar, TrendingUp, AlertCircle, Check, Activity } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import BASE_URL from "../../src/config";
 
 interface TemperatureRecord {
@@ -20,13 +21,14 @@ const TemperatureTracker = () => {
   const [records, setRecords] = useState<TemperatureRecord[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showHistory, setShowHistory] = useState(false); // NEW
 
   // Monitor records state changes
   useEffect(() => {
     console.log('Records state changed:', records.length, 'records');
   }, [records]);
 
-  // Load temperature records from API
+  // Load temperature records from API on component mount
   useEffect(() => {
     const loadRecords = async () => {
       try {
@@ -93,7 +95,7 @@ const TemperatureTracker = () => {
           const timestamp = record.date_time || record.recorded_at || record.timestamp || record.created_at;
           
           // Only include valid records
-          if (!record.id || isNaN(temperature) || temperature <= 0 || !timestamp) {
+          if (!record.id || isNaN(temperature) || temperature <= 0 || temperature > 50 || !timestamp) {
             console.warn('Invalid temperature record found:', record);
             return null;
           }
@@ -264,15 +266,15 @@ const TemperatureTracker = () => {
         isValid: temp != null && !isNaN(temp)
       });
       
-      // Validate the temperature value
-      if (temp == null || isNaN(temp) || temp <= 0) {
+      // Validate the temperature value - ensure it's a valid number
+      if (temp == null || isNaN(temp) || temp <= 0 || temp > 50) {
         console.warn('Invalid temperature value for chart:', record);
         return null;
       }
       
       return {
         name: `${index + 1}`,
-        temperature: temp,
+        temperature: Number(temp), // Ensure it's a number
         date: new Date(record.timestamp).toLocaleDateString()
       };
     } catch (error) {
@@ -280,7 +282,12 @@ const TemperatureTracker = () => {
       return null;
     }
   }).filter(item => {
-    const isValid = item !== null && item.temperature != null && !isNaN(item.temperature);
+    const isValid = item !== null && 
+                   item.temperature != null && 
+                   !isNaN(item.temperature) && 
+                   typeof item.temperature === 'number' &&
+                   item.temperature > 0 &&
+                   item.temperature <= 50;
     if (!isValid && item !== null) {
       console.warn('Filtering out invalid temperature data:', item);
     }
@@ -310,350 +317,312 @@ const TemperatureTracker = () => {
   const trends = calculateTrends();
   const latestReading = records[0];
 
-  return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView className="flex-1">
-        {/* Header */}
-        <View className="bg-white p-4 shadow-sm">
-          <View className="flex-row items-center">
-            <Thermometer className="w-6 h-6 text-[#00b8f1] mr-4 ml-4" />
-            <Text className="text-xl font-bold text-gray-800 ml-2">Body Temperature</Text>
-          </View>
-        </View>
+  // View History Button handler
+  const handleViewHistory = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Error', 'Please log in to view history');
+        return;
+      }
 
-        {/* Input Form */}
-        <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
-          <View className="mb-4">
-            <Text className="text-gray-600 mb-2">Body Temperature</Text>
-            <View className="flex-row items-center">
-              <TextInput
-                className="border border-gray-200 rounded-lg p-4 text-lg flex-1"
-                placeholder={unit === 'C' ? 'e.g., 36.5' : 'e.g., 98.6'}
-                value={temperature}
-                onChangeText={setTemperature}
-                keyboardType="decimal-pad"
-                maxLength={5}
-              />
-              <View className="flex-row ml-2 border border-gray-200 rounded-lg overflow-hidden">
-                <TouchableOpacity
-                  className={`px-4 py-4 ${unit === 'C' ? 'bg-[#00b8f1]' : 'bg-gray-100'}`}
-                  onPress={() => setUnit('C')}
-                >
-                  <Text className={`font-medium ${unit === 'C' ? 'text-white' : 'text-gray-600'}`}>°C</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className={`px-4 py-4 ${unit === 'F' ? 'bg-[#00b8f1]' : 'bg-gray-100'}`}
-                  onPress={() => setUnit('F')}
-                >
-                  <Text className={`font-medium ${unit === 'F' ? 'text-white' : 'text-gray-600'}`}>°F</Text>
-                </TouchableOpacity>
+      const response = await fetch(`${BASE_URL}/api/temp/gettemp`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to load temperature records:', response.status, errorText);
+        Alert.alert('Error', 'Failed to load history. Please try again.');
+        return;
+      }
+
+      const responseData = await response.json();
+      console.log('Fetched temperature records:', responseData);
+      
+      // Handle the correct API response format
+      const records = responseData.records || responseData;
+      
+      if (!Array.isArray(records)) {
+        console.error('API response is not an array:', responseData);
+        Alert.alert('Error', 'Invalid data format received from server');
+        return;
+      }
+      
+      const formattedRecords = records.map((record: any) => {
+        const temperature = parseFloat(record.temperature || record.temp_value || 0);
+        const unit = record.unit || 'C';
+        const notes = record.notes || record.notes_text || '';
+        const timestamp = record.date_time || record.recorded_at || record.timestamp || record.created_at;
+        if (!record.id || isNaN(temperature) || temperature <= 0 || temperature > 50 || !timestamp) {
+          console.warn('Invalid temperature record found:', record);
+          return null;
+        }
+        return {
+          id: record.id,
+          temperature: temperature,
+          unit: unit,
+          notes: notes,
+          timestamp: timestamp
+        };
+      }).filter(record => record !== null);
+      
+      setRecords(formattedRecords);
+      setRefreshKey(prev => prev + 1); // Force re-render
+      setShowHistory(true); // SHOW HISTORY
+      Alert.alert('Success', `History loaded successfully! Found ${formattedRecords.length} valid records.`);
+    } catch (error) {
+      console.error('Error loading temperature records:', error);
+      Alert.alert('Error', 'Failed to load history. Please check your connection and try again.');
+    }
+  };
+
+  return (
+    <LinearGradient
+      colors={['#fff5f5', '#fef3c7']}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView className="flex-1">
+        <ScrollView className="flex-1">
+          {/* Header */}
+          <View className="flex-row items-center justify-center mt-6 mb-2">
+            <Thermometer className="w-6 h-6 text-orange-500 mr-8" />
+            <Text className="text-2xl font-bold text-gray-800">Body Temperature</Text>
+          </View>
+
+          {/* Input Form */}
+          <View className="m-2 p-6 rounded-2xl">
+            <View className="mb-4">
+              <Text className="text-gray-600 mb-2">Body Temperature</Text>
+              <View className="flex-row items-center">
+                <TextInput
+                  className="border border-black rounded-lg p-4 text-lg flex-1 bg-transparent"
+                  placeholder={unit === 'C' ? 'e.g., 36.5' : 'e.g., 98.6'}
+                  value={temperature}
+                  onChangeText={setTemperature}
+                  keyboardType="decimal-pad"
+                  maxLength={5}
+                />
+                <View className="flex-row ml-2 border border-black rounded-lg overflow-hidden">
+                  <TouchableOpacity
+                    className={`px-4 py-4 ${unit === 'C' ? 'bg-orange-500' : 'bg-transparent'}`}
+                    onPress={() => setUnit('C')}
+                  >
+                    <Text className={`font-medium ${unit === 'C' ? 'text-white' : 'text-black'}`}>°C</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    className={`px-4 py-4 ${unit === 'F' ? 'bg-orange-500' : 'bg-transparent'}`}
+                    onPress={() => setUnit('F')}
+                  >
+                    <Text className={`font-medium ${unit === 'F' ? 'text-white' : 'text-black'}`}>°F</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
 
-          <View className="mb-6">
-            <Text className="text-gray-600 mb-2">Notes (optional)</Text>
-            <TextInput
-              className="border border-gray-200 rounded-lg p-4 text-lg h-20"
-              placeholder="Add any notes (e.g., morning, after exercise, etc.)"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-
-          <TouchableOpacity
-            className="bg-[#00b8f1] rounded-lg p-4 items-center"
-            onPress={recordTemperature}
-          >
-            <Text className="text-white text-lg font-semibold">Record Temperature</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Results Display */}
-        {showResults && latestReading && (
-          <View className="bg-white m-4 p-6 rounded-2xl shadow-sm border-l-4 border-green-500">
-            <View className="flex-row items-center mb-3">
-              <Check className="w-5 h-5 text-green-500 mr-2" />
-              <Text className="text-lg font-semibold text-gray-800">Reading Recorded Successfully!</Text>
+            <View className="mb-6">
+              <Text className="text-gray-600 mb-2">Notes (optional)</Text>
+              <TextInput
+                className="border border-black rounded-lg p-4 text-lg h-20 bg-transparent"
+                placeholder="Add any notes..."
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                textAlignVertical="top"
+              />
             </View>
-            {(() => {
-              const result = categorizeTemperature(latestReading.temperature, latestReading.unit);
-              return (
-                <View>
-                  <Text className="text-gray-600 mb-2">
-                    Your temperature ({latestReading.temperature}°{latestReading.unit}) is
-                  </Text>
-                  <View className={`${result.color} rounded-lg p-3 mb-2`}>
-                    <Text className="text-white font-bold text-center">{result.category}</Text>
-                  </View>
-                  <Text className="text-sm text-gray-500 text-center">category</Text>
-                </View>
-              );
-            })()}
+
+            <TouchableOpacity
+              className="bg-black rounded-2xl p-3 items-center"
+              onPress={recordTemperature}
+            >
+              <Text className="text-white text-lg font-semibold">Record Temperature</Text>
+            </TouchableOpacity>
           </View>
-        )}
 
-
-
-        {/* Chart */}
-        {records.length > 0 && (
-          <View className="bg-white m-4 p-6 rounded-2xl shadow-sm">
-            <Text className="text-lg font-semibold text-gray-800 mb-4">Temperature Trend (°C)</Text>
-            {(() => {
-              const validChartData = chartData.filter((d): d is { date: string; temperature: number; name: string } => 
-                d !== null && d.temperature != null && !isNaN(d.temperature)
-              );
-              if (validChartData.length > 0) {
-                try {
-                  return (
-                    <LineChart
-                      data={{
-                        labels: createChartLabels(validChartData),
-                        datasets: [
-                          {
-                            data: validChartData.map(d => d.temperature),
-                            color: (opacity = 1) => `rgba(0, 184, 241, ${opacity})`, // #00b8f1
-                            strokeWidth: 3,
-                          }
-                        ],
-                        legend: ['Temperature (°C)'],
-                      }}
-                      width={Dimensions.get('window').width - 48}
-                      height={220}
-                      yAxisSuffix="°"
-                      chartConfig={{
-                        backgroundColor: '#fff',
-                        backgroundGradientFrom: '#fff',
-                        backgroundGradientTo: '#fff',
-                        decimalPlaces: 1,
-                        color: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
-                        labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                        style: { borderRadius: 16 },
-                        propsForDots: {
-                          r: '4',
-                          strokeWidth: '2',
-                          stroke: '#fff',
-                        },
-                      }}
-                      bezier
-                      style={{ borderRadius: 16 }}
-                    />
-                  );
-                } catch (error) {
-                  console.error('Error rendering chart:', error);
-                  return (
-                    <View className="items-center py-8">
-                      <Text className="text-gray-400">Error rendering chart</Text>
-                      <Text className="text-gray-400 text-sm">Please try refreshing the data</Text>
-                    </View>
-                  );
-                }
-              } else {
+          {/* Results Display */}
+          {showResults && latestReading && (
+            <View className="m-4 p-6 rounded-2xl border border-black">
+              <View className="flex-row items-center mb-3">
+                <Check className="w-5 h-5 text-green-500 mr-2" />
+                <Text className="text-lg font-semibold text-gray-800">Reading Recorded Successfully!</Text>
+              </View>
+              {(() => {
+                const result = categorizeTemperature(latestReading.temperature, latestReading.unit);
                 return (
-                  <View className="items-center py-8">
-                    <Text className="text-gray-400">No valid temperature data available for chart</Text>
-                    <Text className="text-gray-400 text-sm">Record some temperature readings to see trends</Text>
+                  <View>
+                    <Text className="text-gray-600 mb-2">
+                      Your temperature ({latestReading.temperature}°{latestReading.unit}) is
+                    </Text>
+                    <View className={`${result.color} rounded-lg p-3 mb-2`}>
+                      <Text className="text-white font-bold text-center">{result.category}</Text>
+                    </View>
+                    <Text className="text-sm text-gray-500 text-center">category</Text>
                   </View>
                 );
-              }
-            })()}
-            <View className="flex-row justify-center mt-2">
-              <View className="flex-row items-center">
-                <View className="w-4 h-4 bg-[#00b8f1] rounded mr-2"></View>
-                <Text className="text-sm text-gray-600">Temperature</Text>
-              </View>
+              })()}
             </View>
-          </View>
-        )}
-
-        {/* Previous Records */}
-        <View key={refreshKey} className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
-          <Text className="text-lg font-semibold text-gray-800 mb-4">Previous Records</Text>
-          {records.length === 0 ? (
-            <View className="items-center py-8">
-              <Calendar className="w-12 h-12 text-gray-300 mb-2" />
-              <Text className="text-gray-400">No records yet</Text>
-              <Text className="text-gray-400 text-sm">Start by recording your first reading</Text>
-            </View>
-          ) : (
-            records.map((record) => {
-              const result = categorizeTemperature(record.temperature, record.unit);
-              return (
-                <View key={record.id} className="border-b border-gray-100 py-4 last:border-b-0">
-                  <View className="flex-row justify-between items-start mb-2">
-                    <View className="flex-1">
-                      <Text className="text-lg font-semibold text-gray-800">
-                        {record.temperature}°{record.unit}
-                        <Text className="text-sm font-normal text-gray-600">
-                          {' '}({record.unit === 'C' ? 
-                            Math.round(convertTemperature(record.temperature, 'C', 'F') * 10) / 10 :
-                            Math.round(convertTemperature(record.temperature, 'F', 'C') * 10) / 10
-                          }°{record.unit === 'C' ? 'F' : 'C'})
-                        </Text>
-                      </Text>
-                      <Text className="text-sm text-gray-500">{formatDate(record.timestamp)}</Text>
-                    </View>
-                    <View className={`${result.color} rounded-full px-3 py-1`}>
-                      <Text className="text-white text-xs font-semibold">{result.category}</Text>
-                    </View>
-                  </View>
-                  {record.notes && (
-                    <View className="bg-gray-50 rounded-lg p-3 mt-2">
-                      <Text className="text-gray-600 text-sm">{record.notes}</Text>
-                    </View>
-                  )}
-                  <View className="flex-row items-center mt-2">
-                    {result.urgency === 'URGENT' && <AlertCircle className="w-4 h-4 text-red-500 mr-1" />}
-                    <Text className={`text-xs ${result.textColor}`}>
-                      {result.urgency === 'URGENT' && 'Seek immediate medical attention'}
-                      {result.urgency === 'CONCERN' && 'Consult your healthcare provider'}
-                      {result.urgency === 'WATCH' && 'Monitor closely'}
-                      {result.urgency === 'GOOD' && 'Normal body temperature'}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })
           )}
-        </View>
 
-        {/* View History Button */}
-        <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
-          <TouchableOpacity
-            className="bg-gray-100 rounded-lg p-4 items-center border border-gray-200"
-            onPress={async () => {
-              try {
-                const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
-                if (!token) {
-                  Alert.alert('Error', 'Please log in to view history');
-                  return;
-                }
-
-                const response = await fetch(`${BASE_URL}/api/temp/gettemp`, {
-                  method: 'GET',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  },
-                });
-
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  console.error('Failed to load temperature records:', response.status, errorText);
-                  Alert.alert('Error', 'Failed to load history. Please try again.');
-                  return;
-                }
-
-                const responseData = await response.json();
-                console.log('Fetched temperature records:', responseData);
+          {/* Chart - Only show if we have valid data */}
+          {records.length > 0 && chartData.length > 0 && (
+            <View className="m-4 p-6 rounded-2xl border border-black bg-transparent">
+              <Text className="text-lg font-semibold text-gray-800 mb-4">Temperature Trend (°C)</Text>
+              {(() => {
+                const validChartData = chartData.filter((d): d is { date: string; temperature: number; name: string } => 
+                  d !== null && 
+                  d.temperature != null && 
+                  !isNaN(d.temperature) && 
+                  typeof d.temperature === 'number' &&
+                  d.temperature > 0 &&
+                  d.temperature <= 50
+                );
                 
-                // Handle the correct API response format
-                const records = responseData.records || responseData;
-                
-                if (!Array.isArray(records)) {
-                  console.error('API response is not an array:', responseData);
-                  Alert.alert('Error', 'Invalid data format received from server');
-                  return;
-                }
-                
-                const formattedRecords = records.map((record: any) => {
-                  // Handle different possible field names from database
-                  const temperature = record.temperature || record.temp_value;
-                  const unit = record.unit || 'C';
-                  const notes = record.notes || record.notes_text || '';
-                  const timestamp = record.date_time || record.recorded_at || record.timestamp || record.created_at;
-                  
-                  return {
-                    id: record.id,
-                    temperature: temperature,
-                    unit: unit,
-                    notes: notes,
-                    timestamp: timestamp
-                  };
-                });
-                
-                // Validate that we have proper data
-                const validRecords = formattedRecords.filter(record => {
-                  const isValid = record.id && record.temperature && record.timestamp;
-                  if (!isValid) {
-                    console.warn('Invalid record found:', record);
+                if (validChartData.length > 0) {
+                  try {
+                    // Ensure all data points are valid numbers
+                    const chartValues = validChartData.map(d => {
+                      const value = Number(d.temperature);
+                      return isNaN(value) || value <= 0 || value > 50 ? 36.5 : value; // fallback to normal temp
+                    });
+                    
+                    return (
+                      <View className="items-center">
+                        <LineChart
+                          data={{
+                            labels: createChartLabels(validChartData),
+                            datasets: [
+                              {
+                                data: chartValues,
+                                color: (opacity = 1) => `rgba(249, 115, 22, ${opacity})`, // orange-500
+                                strokeWidth: 3,
+                              }
+                            ],
+                            legend: ['Temperature (°C)'],
+                          }}
+                          width={Dimensions.get('window').width - 48}
+                          height={220}
+                          yAxisSuffix="°"
+                          chartConfig={{
+                            backgroundColor: '#ffffff',
+                            backgroundGradientFrom: '#ffffff',
+                            backgroundGradientTo: '#ffffff',
+                            decimalPlaces: 1,
+                            color: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
+                            labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                            style: { 
+                              borderRadius: 16,
+                              backgroundColor: '#ffffff'
+                            },
+                            propsForDots: {
+                              r: '4',
+                              strokeWidth: '2',
+                              stroke: '#ffffff',
+                            },
+                          }}
+                          bezier
+                          style={{ borderRadius: 16 }}
+                        />
+                      </View>
+                    );
+                  } catch (error) {
+                    console.error('Error rendering chart:', error);
+                    return (
+                      <View className="items-center py-8">
+                        <Text className="text-gray-400">Error rendering chart</Text>
+                        <Text className="text-gray-400 text-sm">Please try refreshing the data</Text>
+                      </View>
+                    );
                   }
-                  return isValid;
-                });
-                
-                console.log('Valid records:', validRecords.length, 'out of', formattedRecords.length);
-                setRecords(validRecords);
-                setRefreshKey(prev => prev + 1); // Force re-render
-                console.log('Records state updated with', validRecords.length, 'records');
-                Alert.alert('Success', `History refreshed successfully! Loaded ${validRecords.length} valid records.`);
-              } catch (error) {
-                console.error('Error loading temperature records:', error);
-                Alert.alert('Error', 'Failed to load history. Please check your connection and try again.');
-              }
-            }}
-          >
-            <View className="flex-row items-center">
-              <Calendar className="w-5 h-5 text-gray-600 mr-2" />
-              <Text className="text-gray-700 text-lg font-semibold">View History</Text>
-            </View>
-            <Text className="text-gray-500 text-sm mt-1">Refresh all records from database</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* History Records Section */}
-        {records.length > 0 && (
-          <View className="bg-white m-4 p-6 rounded-2xl shadow-sm mb-8">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-semibold text-gray-800">History Records</Text>
-              <View className="bg-blue-100 rounded-full px-3 py-1">
-                <Text className="text-blue-600 text-sm font-medium">{records.length} records</Text>
+                } else {
+                  return (
+                    <View className="items-center py-8">
+                      <Text className="text-gray-400">No valid temperature data available for chart</Text>
+                      <Text className="text-gray-400 text-sm">Record some temperature readings to see trends</Text>
+                    </View>
+                  );
+                }
+              })()}
+              <View className="flex-row justify-center mt-2">
+                <View className="flex-row items-center">
+                  <View className="w-4 h-4 bg-orange-500 rounded mr-2"></View>
+                  <Text className="text-sm text-gray-600">Temperature</Text>
+                </View>
               </View>
             </View>
-            {records.map((record) => {
-              const result = categorizeTemperature(record.temperature, record.unit);
-              return (
-                <View key={record.id} className="border border-gray-200 rounded-lg p-4 mb-3 bg-gray-50">
-                  <View className="flex-row justify-between items-start mb-2">
-                    <View className="flex-1">
-                      <Text className="text-lg font-semibold text-gray-800">
-                        {record.temperature}°{record.unit}
-                        <Text className="text-sm font-normal text-gray-600">
-                          {' '}({record.unit === 'C' ? 
-                            Math.round(convertTemperature(record.temperature, 'C', 'F') * 10) / 10 :
-                            Math.round(convertTemperature(record.temperature, 'F', 'C') * 10) / 10
-                          }°{record.unit === 'C' ? 'F' : 'C'})
-                        </Text>
-                      </Text>
-                      <Text className="text-sm text-gray-500">{formatDate(record.timestamp)}</Text>
-                    </View>
-                    <View className={`${result.color} rounded-full px-3 py-1`}>
-                      <Text className="text-white text-xs font-semibold">{result.category}</Text>
-                    </View>
-                  </View>
-                  {record.notes && (
-                    <View className="bg-white rounded-lg p-3 mt-2 border border-gray-200">
-                      <Text className="text-gray-600 text-sm">{record.notes}</Text>
-                    </View>
-                  )}
-                  <View className="flex-row items-center mt-2">
-                    {result.urgency === 'URGENT' && <AlertCircle className="w-4 h-4 text-red-500 mr-1" />}
-                    <Text className={`text-xs ${result.textColor}`}>
-                      {result.urgency === 'URGENT' && 'Seek immediate medical attention'}
-                      {result.urgency === 'CONCERN' && 'Consult your healthcare provider'}
-                      {result.urgency === 'WATCH' && 'Monitor closely'}
-                      {result.urgency === 'GOOD' && 'Normal body temperature'}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
+          )}
 
-      </ScrollView>
-    </SafeAreaView>
+          {/* View History Button */}
+          <View className="m-4">
+            <TouchableOpacity
+              className="bg-black rounded-2xl p-3 items-center"
+              onPress={handleViewHistory}
+            >
+              <View className="flex-row items-center">
+                <Calendar className="w-5 h-5 text-white mr-2" />
+                <Text className="text-white text-lg font-semibold">View History</Text>
+              </View>
+              <Text className="text-gray-300 text-sm mt-1">Show all records from database</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* History Records Section - Only show after clicking View History */}
+          {showHistory && records.length > 0 && (
+            <View className="m-4 p-6 rounded-2xl border border-black mb-8">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-lg font-semibold text-gray-800">History Records</Text>
+                <View className="bg-orange-100 rounded-full px-3 py-1">
+                  <Text className="text-orange-600 text-sm font-medium">{records.length} records</Text>
+                </View>
+              </View>
+              {records.map((record) => {
+                const result = categorizeTemperature(record.temperature, record.unit);
+                return (
+                  <View key={record.id} className="border border-gray-200 rounded-lg p-4 mb-3 bg-gray-50">
+                    <View className="flex-row justify-between items-start mb-2">
+                      <View className="flex-1">
+                        <Text className="text-lg font-semibold text-gray-800">
+                          {record.temperature}°{record.unit}
+                          <Text className="text-sm font-normal text-gray-600">
+                            {' '}({record.unit === 'C' ? 
+                              Math.round(convertTemperature(record.temperature, 'C', 'F') * 10) / 10 :
+                              Math.round(convertTemperature(record.temperature, 'F', 'C') * 10) / 10
+                            }°{record.unit === 'C' ? 'F' : 'C'})
+                          </Text>
+                        </Text>
+                        <Text className="text-sm text-gray-500">{formatDate(record.timestamp)}</Text>
+                      </View>
+                      <View className={`${result.color} rounded-full px-3 py-1`}>
+                        <Text className="text-white text-xs font-semibold">{result.category}</Text>
+                      </View>
+                    </View>
+                    {record.notes && (
+                      <View className="bg-white rounded-lg p-3 mt-2 border border-gray-200">
+                        <Text className="text-gray-600 text-sm">{record.notes}</Text>
+                      </View>
+                    )}
+                    <View className="flex-row items-center mt-2">
+                      {result.urgency === 'URGENT' && <AlertCircle className="w-4 h-4 text-red-500 mr-1" />}
+                      <Text className={`text-xs ${result.textColor}`}>
+                        {result.urgency === 'URGENT' && 'Seek immediate medical attention'}
+                        {result.urgency === 'CONCERN' && 'Consult your healthcare provider'}
+                        {result.urgency === 'WATCH' && 'Monitor closely'}
+                        {result.urgency === 'GOOD' && 'Normal body temperature'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 

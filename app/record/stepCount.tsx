@@ -1,394 +1,408 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, SafeAreaView, Alert, ScrollView, FlatList } from 'react-native';
-import { FontAwesome5, MaterialIcons, Ionicons, Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import BASE_URL from "../../src/config";
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import { Pedometer } from 'expo-sensors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import BASE_URL from '../../src/config';
 
-const THEME_COLOR = '#00b8f1';
+const StepCounter = () => {
+  const insets = useSafeAreaInsets();
+  const [currentDay, setCurrentDay] = useState(new Date().getDay());
+  const [stepCount, setStepCount] = useState(0);
+  const [isPedometerAvailable, setIsPedometerAvailable] = useState<boolean | null>(null);
+  const [pedometerError, setPedometerError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [weeklyData, setWeeklyData] = useState<Record<string, any>>({});
 
-interface StepHistory {
-  id?: number;
-  day: string;
-  steps: number;
-  miles: number;
-  minutes: number;
-  calories: number;
-  floors: number;
-}
-
-const StepCount = () => {
-  const [steps, setSteps] = useState(0);
-  const [calories, setCalories] = useState(0);
-  const [distance, setDistance] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [historyData, setHistoryData] = useState<StepHistory[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-
-  const stepGoal = 10000;
-  const progressPercentage = Math.min((steps / stepGoal) * 100, 100);
-
-  // Animation values
-  const scaleValue = useSharedValue(1);
-  const buttonScale = useSharedValue(1);
-
-  // Debug modal state
-  useEffect(() => {
-    console.log('showHistory state changed to:', showHistory);
-  }, [showHistory]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scaleValue.value }],
-  }));
-
-  const buttonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
-
-  const handleAddStep = async () => {
-    // Animate button press
-    buttonScale.value = withSpring(0.95);
-    setTimeout(() => {
-      buttonScale.value = withSpring(1);
-    }, 100);
-
-    const newSteps = steps + 1;
-    const newCalories = calories + 0.04; // Approx calories burned per step
-    const newDistance = distance + 0.762; // Approx meters per step
-
-    setSteps(newSteps);
-    setCalories(newCalories);
-    setDistance(newDistance);
-
-    // Animate progress
-    scaleValue.value = withSpring(1.1);
-    setTimeout(() => {
-      scaleValue.value = withSpring(1);
-    }, 200);
-
-    // Save to database via API
-    await saveStepDataToAPI(newSteps, newCalories, newDistance);
+  // Static data for other days (for now)
+  const stepData: Record<number, { steps: number; miles: number; minutes: number; calories: number; floors: number }> = {
+    0: { steps: 4200, miles: 2.1, minutes: 63, calories: 254, floors: 1 },
+    1: { steps: 6800, miles: 3.4, minutes: 102, calories: 408, floors: 3 },
+    2: { steps: 7200, miles: 3.6, minutes: 108, calories: 432, floors: 2 },
+    3: { steps: 5700, miles: 2.7, minutes: 81, calories: 321, floors: 2 },
+    4: { steps: 8100, miles: 4.1, minutes: 122, calories: 486, floors: 4 },
+    5: { steps: 3200, miles: 1.6, minutes: 48, calories: 192, floors: 1 },
+    6: { steps: 2800, miles: 1.4, minutes: 42, calories: 168, floors: 1 },
   };
 
-  const saveStepDataToAPI = async (stepCount: number, caloriesBurned: number, distanceMeters: number) => {
+  // Load weekly data from backend
+  const loadWeeklyData = async () => {
     try {
-      setIsLoading(true);
-      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
-      
-      if (!token) {
-        Alert.alert('Error', 'Please log in to save step data');
-        return;
-      }
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
 
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      const miles = distanceMeters * 0.000621371; // Convert meters to miles
-      const minutes = Math.floor(stepCount / 100); // Approximate minutes based on steps
+      const response = await fetch(`${BASE_URL}/api/step/get`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const weeklyDataMap: Record<string, any> = {};
+        data.forEach((item: any) => {
+          weeklyDataMap[item.day] = item;
+        });
+        setWeeklyData(weeklyDataMap);
+      }
+    } catch (error) {
+      console.error('Error loading weekly data:', error);
+    }
+  };
+
+  // Save step data to backend
+  const saveStepData = async (day: string, data: any) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
 
       const response = await fetch(`${BASE_URL}/api/step/send`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          day: today,
-          steps: stepCount,
-          miles: miles,
-          minutes: minutes,
-          calories: Math.round(caloriesBurned),
-          floors: 0 // Default value, can be updated later
+          day,
+          steps: data.steps,
+          miles: data.miles,
+          minutes: data.minutes,
+          calories: data.calories,
+          floors: data.floors,
         }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to save step data:', response.status, errorText);
-        Alert.alert('Error', 'Failed to save step data to database. Please try again.');
+      if (response.ok) {
+        console.log('Step data saved successfully');
+        // Reload weekly data after saving
+        await loadWeeklyData();
       } else {
-        const result = await response.json();
-        console.log('Step data saved successfully:', result);
+        console.error('Failed to save step data');
       }
     } catch (error) {
       console.error('Error saving step data:', error);
-      Alert.alert('Error', 'Failed to connect to server. Step data saved locally only.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const fetchStepHistory = async () => {
-    try {
-      console.log('Fetching step history...');
-      setIsLoadingHistory(true);
-      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+  // Auto-save step data when it changes
+  useEffect(() => {
+    if (stepCount > 0 && isPedometerAvailable) {
+      const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      const currentData = {
+        steps: stepCount,
+        miles: (stepCount * 0.0005).toFixed(2),
+        minutes: Math.floor(stepCount / 100),
+        calories: Math.floor(stepCount * 0.06),
+        floors: Math.floor(stepCount / 1500),
+      };
       
-      console.log('Token found:', !!token);
-      
-      if (!token) {
-        Alert.alert('Error', 'Please log in to view history');
-        return;
-      }
+      // Debounce the save to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        saveStepData(today, currentData);
+      }, 2000); // Save after 2 seconds of no changes
 
-      console.log('Making API request to:', `${BASE_URL}/api/step/get`);
-      
-      const response = await fetch(`${BASE_URL}/api/step/get`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      return () => clearTimeout(timeoutId);
+    }
+  }, [stepCount, isPedometerAvailable]);
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+  useEffect(() => {
+    let subscription: any;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to fetch step history:', response.status, errorText);
-        Alert.alert('Error', `Failed to fetch step history. Status: ${response.status}`);
-      } else {
-        const data = await response.json();
-        console.log('Received data:', data);
-        // Ensure data is an array and has valid structure
-        if (Array.isArray(data)) {
-          console.log('Data is array, length:', data.length);
-          setHistoryData(data);
+    const setupPedometer = async () => {
+      try {
+        // Load existing data first
+        await loadWeeklyData();
+
+        // Check if pedometer is available
+        const isAvailable = await Pedometer.isAvailableAsync();
+        setIsPedometerAvailable(isAvailable);
+        
+        if (isAvailable) {
+          // Start watching step count
+          subscription = Pedometer.watchStepCount(result => {
+            console.log('Step count updated:', result.steps);
+            setStepCount(result.steps);
+          });
+          
+          // Also get the current step count
+          try {
+            const currentSteps = await Pedometer.getStepCountAsync(new Date(), new Date());
+            setStepCount(currentSteps.steps);
+          } catch (error) {
+            console.log('Could not get current step count:', error);
+          }
         } else {
-          console.error('Invalid data format received:', data);
-          setHistoryData([]);
-          Alert.alert('Error', 'Invalid data format received from server.');
+          setPedometerError("Pedometer not available on this device");
         }
+      } catch (error) {
+        console.error("Pedometer setup error:", error);
+        setPedometerError("Failed to initialize pedometer");
+        setIsPedometerAvailable(false);
       }
-    } catch (error) {
-      console.error('Error fetching step history:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      Alert.alert('Error', `Failed to connect to server: ${errorMessage}`);
-    } finally {
-      setIsLoadingHistory(false);
-    }
+    };
+
+    setupPedometer();
+
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, []);
+
+  const goalSteps = 10000;
+  
+  // Get current day name
+  const getCurrentDayName = (dayIndex: number) => {
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return dayNames[dayIndex];
   };
 
-  const handleViewHistory = () => {
-    console.log('View History button clicked');
-    if (showHistory) {
-      // If history is already shown, hide it
-      setShowHistory(false);
+  // Get data for current day - use backend data if available, otherwise static data
+  const getCurrentDayData = () => {
+    const today = getCurrentDayName(currentDay);
+    const backendData = weeklyData[today];
+    
+    if (currentDay === new Date().getDay() && isPedometerAvailable) {
+      // Today with pedometer - use real step count
+      const currentSteps = stepCount;
+      return {
+        steps: currentSteps,
+        miles: (currentSteps * 0.0005).toFixed(2),
+        minutes: Math.floor(currentSteps / 100),
+        calories: Math.floor(currentSteps * 0.06),
+        floors: Math.floor(currentSteps / 1500),
+      };
+    } else if (backendData) {
+      // Use backend data if available
+      return {
+        steps: backendData.steps || 0,
+        miles: backendData.miles || 0,
+        minutes: backendData.minutes || 0,
+        calories: backendData.calories || 0,
+        floors: backendData.floors || 0,
+      };
     } else {
-      // If history is hidden, show it and fetch data
-      setShowHistory(true);
-      fetchStepHistory();
+      // Fallback to static data
+      return {
+        steps: stepData[currentDay]?.steps || 0,
+        miles: stepData[currentDay]?.miles || 0,
+        minutes: stepData[currentDay]?.minutes || 0,
+        calories: stepData[currentDay]?.calories || 0,
+        floors: stepData[currentDay]?.floors || 0,
+      };
     }
   };
 
-  const handleReset = () => {
-    setSteps(0);
-    setCalories(0);
-    setDistance(0);
+  const currentData = getCurrentDayData();
+  const currentSteps = currentData.steps;
+  const progressPercentage = Math.min((currentSteps / goalSteps) * 100, 100);
+
+  const radius = 90;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDasharray = circumference;
+  const strokeDashoffset = circumference - (progressPercentage / 100) * circumference;
+
+  const navigateDay = (direction: 'prev' | 'next') => {
+    setCurrentDay((prev) => direction === 'prev' ? (prev === 0 ? 6 : prev - 1) : (prev === 6 ? 0 : prev + 1));
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+
+
+  const getDayCircleColors = (dayIndex: number): string[] | null => {
+    const gradients = [
+      ['#dffd6e', '#14b8a6'], // Sunday
+      ['#fbbf24', '#f59e42'], // Monday
+      ['#f472b6', '#a78bfa'], // Tuesday
+      ['#60a5fa', '#2563eb'], // Wednesday
+      ['#f87171', '#fbbf24'], // Thursday
+      ['#34d399', '#10b981'], // Friday
+      ['#a3e635', '#f472b6'], // Saturday
+    ];
+    return gradients[dayIndex % 7];
   };
 
-  const renderHistoryItem = ({ item }: { item: StepHistory }) => (
-    <View className="bg-white rounded-lg p-4 mb-3 shadow-sm border border-gray-100">
-      <View className="flex-row justify-between items-center mb-2">
-        <Text className="text-lg font-semibold text-gray-800">
-          {formatDate(item.day)}
-        </Text>
-        <View className="bg-blue-100 px-3 py-1 rounded-full">
-          <Text className="text-blue-600 font-medium">{item.steps || 0} steps</Text>
-        </View>
-      </View>
-      
-      <View className="flex-row justify-between">
-        <View className="items-center">
-          <Ionicons name="flame" size={16} color="#f59e0b" />
-          <Text className="text-sm text-gray-600">{item.calories || 0} cal</Text>
-        </View>
-        <View className="items-center">
-          <Ionicons name="map" size={16} color="#3b82f6" />
-          <Text className="text-sm text-gray-600">{(item.miles || 0).toFixed(1)} mi</Text>
-        </View>
-        <View className="items-center">
-          <Ionicons name="time" size={16} color="#10b981" />
-          <Text className="text-sm text-gray-600">{item.minutes || 0} min</Text>
-        </View>
-        <View className="items-center">
-          <Ionicons name="trending-up" size={16} color="#8b5cf6" />
-          <Text className="text-sm text-gray-600">{item.floors || 0} floors</Text>
-        </View>
+  const ProgressCircle = () => (
+    <View className="w-[200px] h-[200px] items-center justify-center">
+      <Svg width="200" height="200" style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <Defs>
+          <SvgLinearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#065f46" />
+            <Stop offset="25%" stopColor="#0891b2" />
+            <Stop offset="50%" stopColor="#0cb6ab" />
+            <Stop offset="75%" stopColor="#14b8a6" />
+            <Stop offset="100%" stopColor="#6ee7b7" />
+          </SvgLinearGradient>
+        </Defs>
+        <Circle cx="100" cy="100" r={radius} stroke="#FFFF" strokeWidth="8" fill="none" />
+        <Circle
+          cx="100"
+          cy="100"
+          r={radius}
+          stroke="url(#progressGradient)"
+          strokeWidth="8"
+          fill="none"
+          strokeDasharray={strokeDasharray}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+        />
+      </Svg>
+      <View className="items-center justify-center">
+        <Text className="text-[40px] font-bold text-black mb-1">{currentSteps.toLocaleString()}</Text>
+        <Text className="text-xs text-gray-400 tracking-wider">STEPS</Text>
       </View>
     </View>
   );
 
+  const DayCircle = ({ dayIndex, dayName }: { dayIndex: number; dayName: string }) => {
+    const colors = getDayCircleColors(dayIndex) ?? ['#6b7280', '#6b7280'];
+    const isSelected = dayIndex === currentDay;
+    return (
+      <TouchableOpacity onPress={() => setCurrentDay(dayIndex)} className="items-center mx-1">
+        <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'border-2 border-white' : ''}`}>
+          <LinearGradient
+            colors={colors as [string, string]}
+            style={{
+              width: isSelected ? 28 : 32,
+              height: isSelected ? 28 : 32,
+              borderRadius: isSelected ? 14 : 16,
+            }}
+          />
+        </View>
+        <Text className="text-[10px] text-gray-400 mt-2">{dayName}</Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView className="flex-1 px-4">
+    <LinearGradient
+      colors={[
+        '#11B5CF',
+        '#0EA5BF',
+        '#0B95AF',
+        '#08859F',
+        '#05758F',
+        '#02657F',
+        '#01556F',
+        '#00455F',
+        '#00354F',
+        '#00253F',
+      ]}
+      className="flex-1"
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+    >
+      <View className="flex-1" style={{ paddingTop: insets.top }}>
         {/* Header */}
-        <View className="pt-6 pb-4">
-          <Text className="text-3xl font-bold text-gray-800 text-center">Step Tracker</Text>
-          <Text className="text-gray-500 text-center mt-1">Track your daily steps</Text>
-        </View>
-
-        {/* Progress Card */}
-        <LinearGradient
-          colors={['#00b8f1', '#0099cc']}
-          className="rounded-2xl p-6 mb-6 shadow-lg"
-        >
-          <View className="items-center">
-            <Animated.View style={animatedStyle}>
-              <View className="w-32 h-32 rounded-full bg-white/20 items-center justify-center mb-4">
-                <FontAwesome5 name="shoe-prints" size={40} color="white" />
-              </View>
-            </Animated.View>
-            
-            <Text className="text-white text-2xl font-bold mb-2">
-              {steps.toLocaleString()} / {stepGoal.toLocaleString()}
-            </Text>
-            <Text className="text-white/90 text-lg mb-4">
-              {progressPercentage.toFixed(1)}% Complete
-            </Text>
-            
-            {/* Progress Bar */}
-            <View className="w-full bg-white/20 rounded-full h-3 mb-4">
-              <View 
-                className="bg-white rounded-full h-3"
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* Stats Cards */}
-        <View className="flex-row justify-between mb-6">
-          <View className="flex-1 bg-white rounded-xl p-4 mr-2 shadow-sm">
-            <View className="items-center">
-              <Ionicons name="flame" size={24} color="#f59e0b" />
-              <Text className="text-xl font-bold text-gray-800 mt-2">{calories.toFixed(1)}</Text>
-              <Text className="text-gray-600 text-sm">Calories</Text>
-            </View>
-          </View>
-          
-          <View className="flex-1 bg-white rounded-xl p-4 ml-2 shadow-sm">
-            <View className="items-center">
-              <Ionicons name="map" size={24} color="#3b82f6" />
-              <Text className="text-xl font-bold text-gray-800 mt-2">{distance.toFixed(1)}</Text>
-              <Text className="text-gray-600 text-sm">Distance (m)</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View className="mb-6">
-          <Animated.View style={buttonAnimatedStyle}>
-            <Pressable
-              onPress={handleAddStep}
-              disabled={isLoading}
-              className={`w-full py-4 rounded-xl mb-4 ${isLoading ? 'opacity-50' : ''}`}
-            >
-              <LinearGradient
-                colors={['#00b8f1', '#0099cc']}
-                className="rounded-xl py-4 items-center"
-              >
-                <Text className="text-white text-lg font-semibold">
-                  {isLoading ? 'Saving...' : 'Add Step'}
-                </Text>
-              </LinearGradient>
-            </Pressable>
-          </Animated.View>
-
-          <View className="flex-row space-x-3">
-            <Pressable
-              onPress={handleReset}
-              className="flex-1 py-4 rounded-xl bg-gray-200"
-            >
-              <Text className="text-center text-gray-700 font-semibold">Reset</Text>
-            </Pressable>
-            
-            <Pressable
-              onPress={handleViewHistory}
-              className="flex-1 py-4 rounded-xl bg-blue-100"
-              style={({ pressed }) => [
-                { opacity: pressed ? 0.7 : 1 }
-              ]}
-            >
-              <Text className="text-center text-blue-600 font-semibold">
-                {showHistory ? 'Hide History' : 'View History'}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Tips Section */}
-        <View className="bg-white rounded-xl p-4 shadow-sm mb-6">
-          <View className="flex-row items-center mb-3">
-            <MaterialIcons name="lightbulb" size={20} color="#facc15" />
-            <Text className="text-gray-800 font-semibold ml-2">Tips</Text>
-          </View>
-          <Text className="text-gray-600 text-sm leading-5">
-            Press "Add Step" each time you take a step. Aim for 10,000 steps daily for optimal health benefits.
+        <View className="px-6 py-4">
+          <Text className="text-3xl font-bold text-white text-center mb-2">
+            Step Counter
+          </Text>
+          <Text className="text-white/80 text-center text-sm">
+            Track your daily activity and stay motivated
           </Text>
         </View>
 
-        {/* History Section */}
-        {showHistory && (
-          <View className="bg-white rounded-xl p-4 shadow-sm mb-6">
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="flex-row items-center">
-                <Ionicons name="time" size={20} color="#3b82f6" />
-                <Text className="text-gray-800 font-semibold ml-2">Step History</Text>
-              </View>
-              <Pressable
-                onPress={() => setShowHistory(false)}
-                className="p-2"
-              >
-                <Ionicons name="close" size={20} color="#6b7280" />
-              </Pressable>
-            </View>
+        {/* Main Content */}
+        <View className="flex-1 px-6">
+          {/* Progress Circle */}
+          <View className="items-center mb-8">
+            <ProgressCircle />
+          </View>
 
-            {isLoadingHistory ? (
-              <View className="py-8 items-center">
-                <Text className="text-gray-600">Loading history...</Text>
+          {/* Current Day Stats */}
+          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
+            <Text className="text-xl font-semibold text-white mb-4 text-center">
+              Today's Progress
+            </Text>
+            <View className="flex-row justify-between">
+              <View className="items-center">
+                <Text className="text-2xl font-bold text-white">{getCurrentDayData().steps}</Text>
+                <Text className="text-white/80 text-sm">Steps</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-2xl font-bold text-white">{getCurrentDayData().miles}</Text>
+                <Text className="text-white/80 text-sm">Miles</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-2xl font-bold text-white">{getCurrentDayData().calories}</Text>
+                <Text className="text-white/80 text-sm">Calories</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-2xl font-bold text-white">{getCurrentDayData().minutes}</Text>
+                <Text className="text-white/80 text-sm">Minutes</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Weekly Overview */}
+          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
+            <Text className="text-xl font-semibold text-white mb-4 text-center">
+              Weekly Overview
+            </Text>
+            <View className="flex-row justify-between">
+              {[0, 1, 2, 3, 4, 5, 6].map((dayIndex) => (
+                <DayCircle
+                  key={dayIndex}
+                  dayIndex={dayIndex}
+                  dayName={getCurrentDayName(dayIndex)}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Navigation */}
+          <View className="flex-row justify-between items-center mb-6">
+            <TouchableOpacity
+              onPress={() => navigateDay('prev')}
+              className="bg-white/20 backdrop-blur-sm rounded-full p-3"
+            >
+              <Ionicons name="chevron-back" size={24} color="white" />
+            </TouchableOpacity>
+            <Text className="text-lg font-semibold text-white">
+              {getCurrentDayName(currentDay)}
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigateDay('next')}
+              className="bg-white/20 backdrop-blur-sm rounded-full p-3"
+            >
+              <Ionicons name="chevron-forward" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Status */}
+          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
+            <Text className="text-lg font-semibold text-white mb-3 text-center">
+              Pedometer Status
+            </Text>
+            {isPedometerAvailable === null ? (
+              <Text className="text-white/80 text-center">Checking availability...</Text>
+            ) : isPedometerAvailable ? (
+              <View className="items-center">
+                <Ionicons name="checkmark-circle" size={48} color="#4ade80" />
+                <Text className="text-white/80 text-center mt-2">
+                  Pedometer is available and tracking steps
+                </Text>
               </View>
             ) : (
-              <View>
-                {historyData.length > 0 ? (
-                  <FlatList
-                    data={historyData}
-                    renderItem={renderHistoryItem}
-                    keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-                    showsVerticalScrollIndicator={false}
-                    scrollEnabled={false}
-                    ListEmptyComponent={
-                      <View className="py-8 items-center">
-                        <Feather name="activity" size={48} color="#9ca3af" />
-                        <Text className="text-gray-500 text-center mt-4">
-                          No step data found.{'\n'}Start tracking your steps to see your history here.
-                        </Text>
-                      </View>
-                    }
-                  />
-                ) : (
-                  <View className="py-8 items-center">
-                    <Feather name="activity" size={48} color="#9ca3af" />
-                    <Text className="text-gray-500 text-center mt-4">
-                      No step data found.{'\n'}Start tracking your steps to see your history here.
-                    </Text>
-                  </View>
-                )}
+              <View className="items-center">
+                <Ionicons name="close-circle" size={48} color="#ef4444" />
+                <Text className="text-white/80 text-center mt-2">
+                  {pedometerError || 'Pedometer is not available on this device'}
+                </Text>
               </View>
             )}
           </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+        </View>
+      </View>
+    </LinearGradient>
   );
 };
 
-export default StepCount;
+export default StepCounter;

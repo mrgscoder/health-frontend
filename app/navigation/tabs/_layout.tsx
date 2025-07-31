@@ -5,7 +5,7 @@ const _layout = () => {
   return (
     <Stack>
       <Stack.Screen
-        name="index"
+        name="HomePage"
         options={{
           title: 'Home',
           headerShown: false,
@@ -15,6 +15,13 @@ const _layout = () => {
         name="food"
         options={{
           title: 'Food',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="foodList"
+        options={{
+          title: 'Food List',
           headerShown: false,
         }}
       />

@@ -15,12 +15,23 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient
-      colors={['#0f0f23', '#1a1a2e', '#16213e', '#0f3460']}
+      colors={[
+        '#11B5CF',
+        '#0EA5BF',
+        '#0B95AF',
+        '#08859F',
+        '#05758F',
+        '#02657F',
+        '#01556F',
+        '#00455F',
+        '#00354F',
+        '#00253F',
+      ]}
       style={styles.container}
     >
       <SafeAreaView style={styles.overlay}>
         <View style={styles.header}>
-          <Text style={styles.mainTitle}> Sleep Tracker</Text>
+          <Text style={styles.mainTitle}>Sleep Tracker</Text>
           <Text style={styles.subTitle}>"Your dreams deserve a gentle start."</Text>
           <Text style={styles.subTitle}>"Track your nights. Improve your days."</Text>
         </View>
@@ -69,64 +80,67 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 24,
-    color: '#C9D6FF',
+    color: '#ffffff',
     fontWeight: '600',
   },
   username: {
     fontSize: 30,
     fontWeight: 'bold',
-    color: '#FFD700',
+    color: '#ffffff',
     marginTop: 5,
   },
   card: {
-    backgroundColor: 'rgba(30, 41, 59, 0.85)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
-    shadowColor: '#00f0ff',
+    shadowColor: '#ffffff',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   title: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 12,
   },
   button: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   buttonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '500',
   },
   mainTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#C9D6FF',
-    textShadowColor: '#1e3a8a',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 10,
   },
-subTitle: {
-  fontSize: 16,
-  fontStyle: 'italic',
-  color: '#a5b4fc',
-  marginTop: 6,
-  textAlign: 'center',
-  maxWidth: '90%',
-},
-cardContainer : {
-  paddingTop : 76,
-}
-
+  subTitle: {
+    fontSize: 16,
+    fontStyle: 'italic',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 6,
+    textAlign: 'center',
+    maxWidth: '90%',
+  },
+  cardContainer: {
+    paddingTop: 76,
+  }
 });

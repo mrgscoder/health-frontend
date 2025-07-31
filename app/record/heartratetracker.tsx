@@ -10,9 +10,11 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-chart-kit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BASE_URL from "../../src/config";
+import { LinearGradient } from 'expo-linear-gradient';
 import { 
   Heart, 
   Activity, 
@@ -44,6 +46,9 @@ const HeartRateTracker = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [addingRecord, setAddingRecord] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyRecords, setHistoryRecords] = useState<HeartRateRecord[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   
   useEffect(() => {
     fetchHeartRateRecords();
@@ -69,7 +74,7 @@ const HeartRateTracker = () => {
       const data = await response.json();
       
       if (response.ok) {
-        setRecords(data.records || data || []);
+        setRecords(data.records || []);
       } else {
         console.error('Failed to fetch heart rate records:', data.error);
         Alert.alert('Error', data.error || 'Failed to fetch records');
@@ -166,6 +171,47 @@ const HeartRateTracker = () => {
     fetchHeartRateRecords();
   };
 
+  const fetchHistory = async () => {
+    try {
+      console.log('Fetching heart rate history...'); // Debug log
+      setLoadingHistory(true);
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      
+      if (!token) {
+        console.error('No token available for fetching heart rate history');
+        Alert.alert('Error', 'Please log in to view history');
+        return;
+      }
+
+      console.log('Making API request to:', `${API_BASE_URL}/gethr`); // Debug log
+      const response = await fetch(`${API_BASE_URL}/gethr`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      console.log('Response status:', response.status); // Debug log
+      const data = await response.json();
+      console.log('Response data:', data); // Debug log
+      
+      if (response.ok) {
+        const historyData = data.records || [];
+        console.log('Setting history records:', historyData.length, 'records'); // Debug log
+        setHistoryRecords(historyData);
+        setShowHistory(true);
+      } else {
+        console.error('Failed to fetch heart rate history:', data.error);
+        Alert.alert('Error', data.error || 'Failed to fetch history');
+      }
+    } catch (error) {
+      console.error('Fetch heart rate history error:', error);
+      Alert.alert('Error', 'Network error. Please try again.');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -213,28 +259,33 @@ const HeartRateTracker = () => {
   const chartData = getChartData();
 
   return (
-    <ScrollView 
-      className="flex-1 bg-gray-50"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    <LinearGradient
+      colors={['#E6E6FA', '#D8BFD8']}
+      style={{ flex: 1 }}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
     >
-      <View className="p-4">
+      <SafeAreaView className="flex-1">
+        <ScrollView 
+          className="flex-1"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          <View className="p-4">
         {/* Header */}
-        <View className="flex-row items-center justify-center mb-6">
-          <Heart size={32} color="#ef4444" className="mr-2" />
-          <Text className="text-3xl font-bold text-gray-800">
+        <View className="flex-row items-center justify-center mt-6 mb-6">
+          <Heart className="w-6 h-6 text-red-500 mr-8" />
+          <Text className="text-2xl font-bold text-gray-800">
             Heart Rate Tracker
           </Text>
         </View>
 
         {/* Add Heart Rate Form */}
-        <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
-          <Text className="text-xl font-semibold text-gray-800 mb-4">Record New Reading</Text>
-          
+        <View className="m-4 p-6 rounded-2xl">
           <View className="mb-4">
-            <Text className="text-gray-600 mb-2 font-medium">Heart Rate (BPM)</Text>
+            <Text className="text-gray-600 mb-2">Heart Rate (BPM)</Text>
             <TextInput
-              className="border border-gray-300 rounded-lg px-4 py-3 text-lg"
-              placeholder="Enter heart rate (e.g., 75)"
+              className="border border-black rounded-lg p-4 text-lg bg-transparent"
+              placeholder="e.g., 75"
               value={heartRate}
               onChangeText={setHeartRate}
               keyboardType="numeric"
@@ -243,24 +294,23 @@ const HeartRateTracker = () => {
           </View>
 
           <View className="mb-6">
-            <Text className="text-gray-600 mb-2 font-medium">Notes (Optional)</Text>
+            <Text className="text-gray-600 mb-2">Notes (optional)</Text>
             <TextInput
-              className="border border-gray-300 rounded-lg px-4 py-3 text-base h-20"
-              placeholder="Add any notes about your reading..."
+              className="border border-black rounded-lg p-4 text-lg h-20 bg-transparent"
+              placeholder="Add any notes..."
               value={notes}
               onChangeText={setNotes}
-              multiline={true}
+              multiline
               textAlignVertical="top"
             />
           </View>
 
           <TouchableOpacity
-            className={`rounded-lg py-4 flex-row items-center justify-center ${loading ? 'bg-gray-400' : 'bg-red-500'}`}
+            className="bg-black rounded-2xl p-3 items-center"
             onPress={addHeartRate}
             disabled={loading}
           >
-            <Activity size={20} color="white" className="mr-2" />
-            <Text className="text-white text-lg font-semibold ml-2">
+            <Text className="text-white text-lg font-semibold">
               {loading ? 'Recording...' : 'Record Heart Rate'}
             </Text>
           </TouchableOpacity>
@@ -277,187 +327,97 @@ const HeartRateTracker = () => {
 
         {/* Chart Section */}
         {chartData && (
-          <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
-            <View className="flex-row items-center mb-4">
-              <TrendingUp size={24} color="#374151" className="mr-2" />
-              <Text className="text-xl font-semibold text-gray-800">Recent Trends</Text>
+          <View className="m-4 p-6 rounded-2xl border border-black bg-transparent">
+            <Text className="text-lg font-semibold text-gray-800 mb-4">Heart Rate Trend</Text>
+            <View className="items-center">
+              <LineChart
+                data={chartData}
+                width={screenWidth - 80}
+                height={180}
+                chartConfig={{
+                  backgroundColor: '#ffffff',
+                  backgroundGradientFrom: '#ffffff',
+                  backgroundGradientTo: '#ffffff',
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(31, 41, 55, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                  style: { 
+                    borderRadius: 16,
+                    backgroundColor: '#ffffff'
+                  },
+                  propsForDots: {
+                    r: '3',
+                    strokeWidth: '2',
+                    stroke: '#ffffff',
+                  },
+                }}
+                bezier
+                style={{ borderRadius: 16 }}
+              />
             </View>
-            <LineChart
-              data={chartData}
-              width={screenWidth - 80}
-              height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={{
-                marginVertical: 8,
-                borderRadius: 16,
-              }}
-              decorator={() => {
-                return null;
-              }}
-            />
             <Text className="text-gray-500 text-center mt-2">Last 7 readings</Text>
           </View>
         )}
 
-        {/* Statistics */}
-        {records.length > 0 && (
-          <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
-            <View className="flex-row items-center mb-4">
-              <BarChart3 size={24} color="#374151" className="mr-2" />
-              <Text className="text-xl font-semibold text-gray-800">Quick Stats</Text>
-            </View>
-            <View className="flex-row justify-around">
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-red-500">
-                  {records.length > 0 ? records[0].rate : '--'}
-                </Text>
-                <Text className="text-gray-600">Latest</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-green-500">
-                  {records.length > 0 ? Math.round(records.reduce((sum, r) => sum + r.rate, 0) / records.length) : '--'}
-                </Text>
-                <Text className="text-gray-600">Average</Text>
-              </View>
-              <View className="items-center">
-                <Text className="text-2xl font-bold text-[#11B5CF]">
-                  {records.length}
-                </Text>
-                <Text className="text-gray-600">Total</Text>
-              </View>
-            </View>
-          </View>
-        )}
 
-        {/* Records List */}
-        <View className="bg-white rounded-xl p-6 shadow-sm">
-          <View className="flex-row items-center mb-4">
-            <FileText size={24} color="#374151" className="mr-2" />
-            <Text className="text-xl font-semibold text-gray-800">
-              Recent Records ({records.length})
-            </Text>
-          </View>
-
-          {loading && records.length === 0 ? (
-            <View className="py-8">
-              <Text className="text-center text-gray-500">Loading records...</Text>
-            </View>
-          ) : records.length === 0 ? (
-            <View className="py-8">
-              <Text className="text-center text-gray-500">No records found</Text>
-              <Text className="text-center text-gray-400 mt-2">Add your first heart rate reading above</Text>
-            </View>
-          ) : (
-            <View>
-              {records.map((record) => {
-                const status = getHeartRateStatus(record.rate);
-                return (
-                  <View 
-                    key={record.id} 
-                    className="flex-row items-center justify-between py-4 border-b border-gray-100"
-                  >
-                    <View className="flex-1">
-                      <View className="flex-row items-center mb-1">
-                        <Text className="text-2xl font-bold text-gray-800 mr-3">
-                          {record.rate}
-                        </Text>
-                        <View className={`px-2 py-1 rounded-full ${status.bg}`}>
-                          <Text className={`text-xs font-medium ${status.color}`}>
-                            {status.status}
-                          </Text>
-                        </View>
-                      </View>
-                      <View className="flex-row items-center">
-                        <Clock size={14} color="#6b7280" className="mr-1" />
-                        <Text className="text-gray-500 text-sm">
-                          {formatDate(record.date_time)}
-                        </Text>
-                      </View>
-                      {record.notes && (
-                        <View className="flex-row items-start mt-1">
-                          <AlertCircle size={14} color="#6b7280" className="mr-1 mt-0.5" />
-                          <Text className="text-gray-600 text-sm italic flex-1">
-                            "{record.notes}"
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Heart size={20} color="#ef4444" />
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
 
         {/* View History Button */}
-        <View className="bg-white rounded-xl p-6 mb-6 shadow-sm">
+        <View className="m-4">
           <TouchableOpacity
-            className="bg-[#11B5CF] rounded-lg py-4 flex-row items-center justify-center"
-            onPress={fetchHeartRateRecords}
-            disabled={loading}
+            className="bg-black rounded-2xl p-3 items-center"
+            onPress={fetchHistory}
+            disabled={loadingHistory}
           >
-            <FileText size={20} color="white" className="mr-2" />
-            <Text className="text-white text-lg font-semibold ml-2">
-              View Full History
+            <Text className="text-white text-lg font-semibold">
+              {loadingHistory ? 'Loading...' : 'View History'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Full History Section - Show when records are loaded */}
-        {records.length > 0 && (
-          <View className="bg-white rounded-xl p-6 shadow-sm">
-            <View className="flex-row items-center mb-4">
-              <RefreshCw size={24} color="#374151" className="mr-2" />
-              <Text className="text-xl font-semibold text-gray-800">
-                Full History ({records.length} records)
-              </Text>
-            </View>
-
-            <View>
-              {records.map((record) => {
-                const status = getHeartRateStatus(record.rate);
-                return (
-                  <View 
-                    key={record.id} 
-                    className="flex-row items-center justify-between py-4 border-b border-gray-100"
-                  >
-                    <View className="flex-1">
-                      <View className="flex-row items-center mb-1">
-                        <Text className="text-2xl font-bold text-gray-800 mr-3">
-                          {record.rate}
-                        </Text>
-                        <View className={`px-2 py-1 rounded-full ${status.bg}`}>
-                          <Text className={`text-xs font-medium ${status.color}`}>
-                            {status.status}
+        {/* History Records */}
+        {showHistory && (
+          <View className="m-4 p-6 rounded-2xl border border-black mb-8">
+            <Text className="text-lg font-semibold text-gray-800 mb-4">Complete History ({historyRecords.length} records)</Text>
+            {historyRecords.length === 0 ? (
+              <View className="items-center py-8">
+                <Text className="text-gray-400">No history records found</Text>
+              </View>
+            ) : (
+              <View>
+                {historyRecords.map((record) => {
+                  const status = getHeartRateStatus(record.rate);
+                  return (
+                    <View 
+                      key={record.id} 
+                      className="border-b border-gray-100 py-4 last:border-b-0"
+                    >
+                      <View className="flex-row justify-between items-start mb-2">
+                        <View className="flex-1">
+                          <Text className="text-lg font-semibold text-gray-800">
+                            {record.rate} BPM
                           </Text>
+                          <Text className="text-sm text-gray-500">{formatDate(record.date_time)}</Text>
+                        </View>
+                        <View className={`${status.bg} rounded-full px-3 py-1`}>
+                          <Text className="text-black text-xs font-semibold">{status.status}</Text>
                         </View>
                       </View>
-                      <View className="flex-row items-center">
-                        <Clock size={14} color="#6b7280" className="mr-1" />
-                        <Text className="text-gray-500 text-sm">
-                          {formatDate(record.date_time)}
-                        </Text>
-                      </View>
                       {record.notes && (
-                        <View className="flex-row items-start mt-1">
-                          <AlertCircle size={14} color="#6b7280" className="mr-1 mt-0.5" />
-                          <Text className="text-gray-600 text-sm italic flex-1">
-                            "{record.notes}"
-                          </Text>
+                        <View className="bg-gray-50 rounded-lg p-3 mt-2">
+                          <Text className="text-gray-600 text-sm">{record.notes}</Text>
                         </View>
                       )}
                     </View>
-                    <Heart size={20} color="#ef4444" />
-                  </View>
-                );
-              })}
-            </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         )}
       </View>
-    </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 

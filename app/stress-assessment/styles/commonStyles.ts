@@ -96,7 +96,7 @@ export const commonStyles: CommonStyles = StyleSheet.create({
     fontWeight: '600',
   },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
     borderRadius: 10,
     padding: 20,
     marginVertical: 10,
@@ -122,7 +122,7 @@ export const commonStyles: CommonStyles = StyleSheet.create({
     marginVertical: 30,
   },
   assessmentCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
