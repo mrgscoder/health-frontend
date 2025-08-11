@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, Dimensions } from 'react-native';
-import { User, Target, Plus, TrendingUp, Calendar, Edit, MoreVertical, Flame, Bell, ArrowRight, Activity, Moon, Droplets, Utensils, Dumbbell, Scale, Heart, Thermometer, Wind, Zap, Brain, Pill, Timer, Apple } from 'lucide-react-native';
+import { User, Target, Plus, TrendingUp, Calendar, Edit, MoreVertical, Flame, Bell, ArrowRight, Activity, Moon, Droplets, Utensils, Dumbbell, Scale, Heart, Thermometer, Wind, Zap, Brain, Pill, Timer, Apple, BarChart3 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import BASE_URL from '../../../src/config';
 import { clearAuthData } from '../../utils/authUtils';
 import { PanGestureHandler, NativeViewGestureHandler, PanGestureHandlerGestureEvent, State } from 'react-native-gesture-handler';
+import cardSequenceService, { CardPosition } from '../../../src/services/cardSequenceService';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -46,7 +47,11 @@ const HealthTrackerDashboard = () => {
   });
 
   const [userName, setUserName] = useState('');
-  const [statOrder, setStatOrder] = useState<Stat[]>([
+  const [statOrder, setStatOrder] = useState<Stat[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Default stat configuration
+  const defaultStats: Stat[] = [
     { id: 'medicineTracking', icon: Pill, title: 'Medicine Tracking' },
     { id: 'calories', icon: Apple, title: 'Calories', current: goals.calories.current, target: goals.calories.target, unit: ' cal' },
     { id: 'water', icon: Droplets, title: 'Water', current: goals.water.current, target: goals.water.target, unit: ' glasses' },
@@ -61,7 +66,9 @@ const HealthTrackerDashboard = () => {
     { id: 'bloodSugar', icon: Flame, title: 'Blood Sugar', current: goals.bloodSugar.current, target: goals.bloodSugar.target, unit: ' mg/dL' },
     { id: 'bodyFat', icon: Scale, title: 'Body Fat', current: goals.bodyFat.current, target: goals.bodyFat.target, unit: '%' },
     { id: 'stressAssessment', icon: Heart, title: 'Happiness Score' },
-  ]);
+    { id: 'analytics', icon: BarChart3, title: 'Analytics' },
+    { id: 'foodAnalytics', icon: Utensils, title: 'Food Analytics' },
+  ];
 
   const positions: { [key: string]: { translateX: Animated.SharedValue<number>; translateY: Animated.SharedValue<number>; zIndex: Animated.SharedValue<number> } } = {
     medicineTracking: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
@@ -78,9 +85,111 @@ const HealthTrackerDashboard = () => {
     bloodSugar: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
     bodyFat: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
     stressAssessment: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
+    analytics: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
+    foodAnalytics: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
   };
 
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Function to load card sequence from backend
+  const loadCardSequence = async () => {
+    try {
+      const response = await cardSequenceService.getUserCardSequence();
+      if (response.success && response.cardSequence) {
+        // Map backend card names to frontend IDs
+        const cardNameToId: { [key: string]: string } = {
+          'medicine_tracking': 'medicineTracking',
+          'calories': 'calories',
+          'water': 'water',
+          'steps': 'steps',
+          'sleep': 'sleep',
+          'blood_pressure': 'bloodPressure',
+          'heart_rate': 'heartRate',
+          'temperature': 'temperature',
+          'breath_retention': 'breathRetention',
+          'blood_oxygen': 'bloodOxygen',
+          'cardio': 'cardio',
+          'blood_sugar': 'bloodSugar',
+          'body_fat': 'bodyFat',
+          'happiness_score': 'stressAssessment',
+          'analytics': 'analytics',
+          'food_analytics': 'foodAnalytics'
+        };
+
+        // Create ordered stats based on backend sequence
+        const orderedStats: Stat[] = [];
+        response.cardSequence.forEach((card: any) => {
+          const statId = cardNameToId[card.card_name];
+          const stat = defaultStats.find(s => s.id === statId);
+          if (stat) {
+            orderedStats.push(stat);
+          }
+        });
+
+        // Add any missing stats at the end
+        defaultStats.forEach(stat => {
+          if (!orderedStats.find(s => s.id === stat.id)) {
+            orderedStats.push(stat);
+          }
+        });
+
+        setStatOrder(orderedStats);
+      } else {
+        // Fallback to default order if API fails
+        setStatOrder(defaultStats);
+      }
+    } catch (error) {
+      console.error('Error loading card sequence:', error);
+      // Fallback to default order
+      setStatOrder(defaultStats);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to save card sequence to backend
+  const saveCardSequence = async (newOrder: Stat[]) => {
+    try {
+      console.log('🔄 Saving card sequence...', newOrder.map(s => s.id));
+      
+      // Map frontend IDs to backend card names
+      const idToCardName: { [key: string]: string } = {
+        'medicineTracking': 'medicine_tracking',
+        'calories': 'calories',
+        'water': 'water',
+        'steps': 'steps',
+        'sleep': 'sleep',
+        'bloodPressure': 'blood_pressure',
+        'heartRate': 'heart_rate',
+        'temperature': 'temperature',
+        'breathRetention': 'breath_retention',
+        'bloodOxygen': 'blood_oxygen',
+        'cardio': 'cardio',
+        'bloodSugar': 'blood_sugar',
+        'bodyFat': 'body_fat',
+        'stressAssessment': 'happiness_score',
+        'analytics': 'analytics',
+        'foodAnalytics': 'food_analytics'
+      };
+
+      const cardSequence: CardPosition[] = newOrder.map((stat, index) => ({
+        card_name: idToCardName[stat.id],
+        position_number: index + 1
+      }));
+
+      console.log('📤 Sending card sequence to backend:', cardSequence);
+      const response = await cardSequenceService.updateCardPositions(cardSequence);
+      console.log('✅ Card sequence saved successfully:', response);
+      
+      // Reload the card sequence to verify it was saved
+      setTimeout(() => {
+        console.log('🔄 Reloading card sequence to verify save...');
+        loadCardSequence();
+      }, 1000);
+    } catch (error) {
+      console.error('❌ Error saving card sequence:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -121,7 +230,9 @@ const HealthTrackerDashboard = () => {
         });
       }
     };
+    
     fetchUserProfile();
+    loadCardSequence();
   }, []);
 
   const formatDate = (date: Date) => {
@@ -201,6 +312,14 @@ const HealthTrackerDashboard = () => {
       router.push('../../health/medicine');
       return;
     }
+    if (itemId === 'analytics') {
+      router.push('/record/Analytics');
+      return;
+    }
+    if (itemId === 'foodAnalytics') {
+      router.push('/navigation/tabs/foodList');
+      return;
+    }
 
     const newSelected = new Set(selectedItems);
     if (newSelected.has(itemId)) {
@@ -275,7 +394,8 @@ const HealthTrackerDashboard = () => {
               const distance = Math.sqrt(
                 Math.pow(newX - otherX, 2) + Math.pow(newY - otherY, 2)
               );
-              if (distance < minDistance && distance < CARD_WIDTH / 2) {
+              console.log(`📏 Distance from ${index} to ${i}: ${distance.toFixed(2)}`);
+              if (distance < minDistance && distance < CARD_WIDTH) { // Increased threshold
                 minDistance = distance;
                 closestIndex = i;
               }
@@ -284,12 +404,18 @@ const HealthTrackerDashboard = () => {
         }
 
         if (closestIndex !== index && statOrder && statOrder.length > 0) {
+          console.log(`🔄 Swapping cards: index ${index} with ${closestIndex}`);
           runOnJS(setStatOrder)((prev) => {
             if (!prev || prev.length === 0) return prev;
             const newOrder = [...prev];
             [newOrder[index], newOrder[closestIndex]] = [newOrder[closestIndex], newOrder[index]];
+            console.log('📝 New order after swap:', newOrder.map(s => s.id));
+            // Save the new order to backend
+            runOnJS(saveCardSequence)(newOrder);
             return newOrder;
           });
+        } else {
+          console.log('❌ No swap detected or invalid conditions');
         }
 
         translateX.value = withSpring(0);
@@ -302,13 +428,14 @@ const HealthTrackerDashboard = () => {
     };
 
     const handleLongPress = () => {
+      console.log('🎯 Long press detected for card:', stat.id);
       setIsDraggingEnabled(true);
     };
 
     const handlePressIn = () => {
       const timer = setTimeout(() => {
         handleLongPress();
-      }, 1300); // Explicitly set to 2 seconds (2000ms)
+      }, 800); // Reduced to 800ms for easier testing
       setLongPressTimer(timer);
     };
 
@@ -398,17 +525,17 @@ const HealthTrackerDashboard = () => {
               <View
                 className="w-14 h-14 rounded-full items-center justify-center mb-3"
                 style={{
-                  backgroundColor: color + '33',
+                  backgroundColor: 'transparent',
                 }}
               >
-                <stat.icon size={40} color={color} />
+                <stat.icon size={50} color="#11B5CF" />
               </View>
               <Text className="text-sm font-semibold text-gray-700 text-center mb-1">
                 {stat.title}
               </Text>
               {isDraggingEnabled && (
                 <Text className="text-xs text-blue-600 font-medium text-center mb-1">
-                  Drag to reorder
+                  🎯 Drag to reorder
                 </Text>
               )}
             </TouchableOpacity>
@@ -464,6 +591,7 @@ const HealthTrackerDashboard = () => {
                         </Text>
                         <Text className="text-white font-medium">{formatDate(currentDate)}</Text>
                       </View>
+
                     </View>
                   </View>
                 </View>
@@ -473,10 +601,16 @@ const HealthTrackerDashboard = () => {
               <View className="px-6 pb-6">
                 {/* Health Metrics Grid */}
                 <View className="flex-row flex-wrap justify-between">
-                  {statOrder && statOrder.length > 0 ? statOrder.map((stat, index) => (
-                    <DraggableStatCard key={stat.id} stat={stat} index={index} />
-                  )) : (
-                    <Text className="text-white text-center">Loading...</Text>
+                  {isLoading ? (
+                    <View className="w-full items-center py-8">
+                      <Text className="text-white text-center text-lg">Loading your health cards...</Text>
+                    </View>
+                  ) : statOrder && statOrder.length > 0 ? (
+                    statOrder.map((stat, index) => (
+                      <DraggableStatCard key={stat.id} stat={stat} index={index} />
+                    ))
+                  ) : (
+                    <Text className="text-white text-center">No cards available</Text>
                   )}
                 </View>
               </View>

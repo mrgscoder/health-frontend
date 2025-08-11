@@ -57,7 +57,7 @@ export { EXERCISES };
 
 const CardioExercises = ({ router }: { router: ReturnType<typeof useRouter> }) => (
   <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-    <Text className="text-2xl font-bold text-gray-800 mb-4">Cardio: Posture & Exercise</Text>
+    <Text className="text-lg font-bold text-gray-800 mb-4">Cardio: Posture & Exercise</Text>
     {EXERCISES.map((item, idx) => (
       <View key={idx} style={styles.exerciseCard}>
         <Text style={styles.exerciseTitle}>{item.title}</Text>
@@ -112,12 +112,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   exerciseTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   exerciseDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#555',
     marginBottom: 12,
   },

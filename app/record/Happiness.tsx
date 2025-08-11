@@ -188,7 +188,7 @@ export default function OxfordHappinessScreen() {
   if (showWelcome) {
     return (
       <LinearGradient
-        colors={['#27a1ba', '#0b566f']} // Purple/blue gradient matching dashboard
+        colors={['#FDE68A', '#FCA5A5', '#A5B4FC', '#6EE7B7']} // New gradient colors
         style={styles.container}
       >
         <SafeAreaView style={styles.safeArea}>
@@ -209,8 +209,12 @@ export default function OxfordHappinessScreen() {
               </Text>
               <View style={styles.testDetails}>
                 <Text style={styles.testDetailItem}>📊 29 Questions</Text>
+              </View>
+              <View style={styles.testDetails}>
                 <Text style={styles.testDetailItem}>⏱️ 5-7 Minutes</Text>
-                <Text style={styles.testDetailItem}>📈 Instant Results</Text>
+              </View>
+              <View style={styles.testDetails}>
+                <Text style={styles.testDetailItem}>📈 Insights</Text>
               </View>
             </View>
 
@@ -237,7 +241,7 @@ export default function OxfordHappinessScreen() {
   if (showResult && result) {
     return (
       <LinearGradient
-        colors={['#27a1ba', 'e4e2f7']}
+        colors={['#FDE68A', '#FCA5A5', '#A5B4FC', '#6EE7B7']}
         style={styles.container}
       >
         <SafeAreaView style={styles.safeArea}>
@@ -264,12 +268,12 @@ export default function OxfordHappinessScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.secondaryButton} 
-              onPress={() => router.replace('/')}
-            >
-              <Text style={styles.secondaryButtonText}>Back to Home</Text>
-            </TouchableOpacity>
+                          <TouchableOpacity 
+                style={styles.secondaryButton} 
+                onPress={() => router.replace('/navigation/tabs/HomePage')}
+              >
+                <Text style={styles.secondaryButtonText}>Back to Home</Text>
+              </TouchableOpacity>
 
           </View>
         </SafeAreaView>
@@ -281,11 +285,11 @@ export default function OxfordHappinessScreen() {
   const progress = ((step + 1) / OXFORD_QUESTIONS.length) * 100;
   return (
     <LinearGradient
-      colors={['#27a1ba', '#e4e2f7']}
+      colors={['#FDE68A', '#FCA5A5', '#A5B4FC', '#6EE7B7']}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.questionScreenContainer}>
           
           {/* Header */}
           <View style={styles.testHeaderCard}>
@@ -350,9 +354,9 @@ export default function OxfordHappinessScreen() {
         color="#667eea" 
       />
   </TouchableOpacity>
-</View>
+          </View>
 
-        </ScrollView>
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -379,6 +383,13 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 40,
   },
+  questionScreenContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 20,
+    justifyContent: 'space-between',
+  },
   
   // Welcome Screen Styles
   headerCard: {
@@ -394,14 +405,14 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#2d3748',
     textAlign: 'center',
     marginBottom: 8,
   },
   headerSubtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#667eea',
     fontWeight: '600',
     textAlign: 'center',
@@ -418,26 +429,23 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   descriptionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2d3748',
     marginBottom: 16,
   },
   descriptionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#4a5568',
-    lineHeight: 24,
+    lineHeight: 20,
     marginBottom: 20,
   },
   testDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
+    alignItems: 'flex-start',
+    paddingTop: 8,
   },
   testDetailItem: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#667eea',
     fontWeight: '600',
     textAlign: 'center',
@@ -458,7 +466,7 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   
@@ -490,7 +498,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resultTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#2d3748',
   },
@@ -511,13 +519,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   resultScore: {
-    fontSize: 64,
+    fontSize: 48,
     fontWeight: 'bold',
     color: '#667eea',
     marginBottom: 8,
   },
   resultLevel: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#2d3748',
   },
@@ -527,18 +535,18 @@ const styles = StyleSheet.create({
     borderTopColor: '#e2e8f0',
   },
   resultTip: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#4a5568',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 20,
   },
   
   // Test Screen Styles
   testHeaderCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
+    padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
@@ -546,7 +554,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   testTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2d3748',
     textAlign: 'center',
@@ -569,15 +577,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   progressText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#667eea',
     fontWeight: '600',
   },
   questionCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
-    padding: 28,
-    marginBottom: 24,
+    padding: 20,
+    marginBottom: 16,
+    flex: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
@@ -585,29 +594,32 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   questionText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#2d3748',
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 24,
-    lineHeight: 26,
+    lineHeight: 22,
   },
   optionsContainer: {
-    gap: 12,
+    gap: 8,
+    flex: 1,
+    justifyContent: 'space-evenly',
   },
   optionButton: {
     backgroundColor: '#f7fafc',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     borderWidth: 2,
     borderColor: '#e2e8f0',
+    minHeight: 50,
   },
   selectedOptionButton: {
     backgroundColor: 'rgba(102, 126, 234, 0.1)',
     borderColor: '#667eea',
   },
   optionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#4a5568',
     textAlign: 'center',
     fontWeight: '500',
@@ -621,7 +633,8 @@ const styles = StyleSheet.create({
   navigationContainer: {
     flexDirection: 'row',
     gap: 16,
-    marginTop: 8,
+    marginTop: 16,
+    justifyContent: 'center',
   },
   navButton: {
     flex: 1,
@@ -640,7 +653,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   navButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#667eea',
     fontWeight: '600',
   },
@@ -648,7 +661,7 @@ const styles = StyleSheet.create({
     color: '#a0aec0',
   },
   nextButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#fff',
     fontWeight: '700',
   },
@@ -673,12 +686,12 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   secondaryButtonText: {
     color: '#667eea',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
 });

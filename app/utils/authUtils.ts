@@ -135,4 +135,18 @@ export const saveUserHealthData = async (healthData: HealthData): Promise<void> 
   } catch (error) {
     console.log('Error saving health data to AsyncStorage:', error);
   }
+};
+
+// Get authentication token from AsyncStorage
+export const getAuthToken = async (): Promise<string | null> => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    if (token && !isTokenExpired(token)) {
+      return token;
+    }
+    return null;
+  } catch (error) {
+    console.log('Error getting auth token:', error);
+    return null;
+  }
 }; 

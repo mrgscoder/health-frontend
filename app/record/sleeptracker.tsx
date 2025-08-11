@@ -15,18 +15,7 @@ export default function HomeScreen() {
 
   return (
     <LinearGradient
-      colors={[
-        '#11B5CF',
-        '#0EA5BF',
-        '#0B95AF',
-        '#08859F',
-        '#05758F',
-        '#02657F',
-        '#01556F',
-        '#00455F',
-        '#00354F',
-        '#00253F',
-      ]}
+      colors={['#0F172A', '#1E293B', '#334155', '#475569']}
       style={styles.container}
     >
       <SafeAreaView style={styles.overlay}>
@@ -90,26 +79,26 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
-    shadowColor: '#ffffff',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   title: {
-    color: '#ffffff',
+    color: '#1E293B',
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 12,
   },
   button: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#1E293B',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -117,7 +106,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#334155',
   },
   buttonText: {
     color: '#ffffff',

@@ -58,7 +58,10 @@ const MedicineTracker: React.FC = () => {
 
   // Date picker states
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+    const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  
+  // Dosage dropdown state
+  const [showDosageDropdown, setShowDosageDropdown] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -566,7 +569,7 @@ const MedicineTracker: React.FC = () => {
       <View className="flex-1 flex-row items-center">
         {/* Hour */}
         <TextInput
-          className="flex-1 border border-white/20 rounded-xl p-2 mr-2 text-center text-base bg-white/10"
+          className="flex-1 border border-gray-300 rounded-xl p-2 mr-2 text-center text-base bg-white text-gray-800"
           value={timeSlot.hour}
           onChangeText={(text) => {
             // Allow empty string or valid hours (1-12)
@@ -575,14 +578,15 @@ const MedicineTracker: React.FC = () => {
             }
           }}
           placeholder="9"
+          placeholderTextColor="#9CA3AF"
           keyboardType="numeric"
           maxLength={2}
         />
-        <Text className="text-white/80 mx-1 font-semibold">:</Text>
+        <Text className="text-gray-700 mx-1 font-semibold text-lg">:</Text>
         
         {/* Minute */}
         <TextInput
-          className="flex-1 border border-white/20 rounded-xl p-2 mr-2 text-center text-base bg-white/10"
+          className="flex-1 border border-gray-300 rounded-xl p-2 mr-2 text-center text-base bg-white text-gray-800"
           value={timeSlot.minute}
           onChangeText={(text) => {
             // Allow empty string or valid minutes (0-59)
@@ -591,25 +595,26 @@ const MedicineTracker: React.FC = () => {
             }
           }}
           placeholder="00"
+          placeholderTextColor="#9CA3AF"
           keyboardType="numeric"
           maxLength={2}
         />
         
         {/* AM/PM */}
-        <View className="flex-row border border-white/20 rounded-xl overflow-hidden bg-white/10">
+        <View className="flex-row border border-gray-300 rounded-xl overflow-hidden bg-white">
           <TouchableOpacity
-            className={`px-2 py-2 ${timeSlot.period === 'AM' ? 'bg-white/20' : 'bg-white/10'}`}
+            className={`px-3 py-2 ${timeSlot.period === 'AM' ? 'bg-blue-500' : 'bg-gray-100'}`}
             onPress={() => updateTimeSlot(index, 'period', 'AM')}
           >
-            <Text className={`text-sm font-semibold ${timeSlot.period === 'AM' ? 'text-white' : 'text-white/80'}`}>
+            <Text className={`text-sm font-semibold ${timeSlot.period === 'AM' ? 'text-white' : 'text-gray-700'}`}>
               AM
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            className={`px-2 py-2 ${timeSlot.period === 'PM' ? 'bg-white/20' : 'bg-white/10'}`}
+            className={`px-3 py-2 ${timeSlot.period === 'PM' ? 'bg-blue-500' : 'bg-gray-100'}`}
             onPress={() => updateTimeSlot(index, 'period', 'PM')}
           >
-            <Text className={`text-sm font-semibold ${timeSlot.period === 'PM' ? 'text-white' : 'text-white/80'}`}>
+            <Text className={`text-sm font-semibold ${timeSlot.period === 'PM' ? 'text-white' : 'text-gray-700'}`}>
               PM
             </Text>
           </TouchableOpacity>
@@ -721,7 +726,15 @@ const MedicineTracker: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView className="flex-1 px-5 py-4" showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              className="flex-1 px-5 py-4" 
+              showsVerticalScrollIndicator={false}
+              onTouchStart={() => {
+                if (showDosageDropdown) {
+                  setShowDosageDropdown(false);
+                }
+              }}
+            >
               <View className="mb-4">
                 <Text className="text-gray-700 mb-2 text-base font-medium">Medicine Name *</Text>
                 <TextInput
@@ -734,22 +747,48 @@ const MedicineTracker: React.FC = () => {
 
               <View className="mb-4">
                 <Text className="text-gray-700 mb-2 text-base font-medium">Dosage *</Text>
-                <View className="border border-gray-300 rounded-xl overflow-hidden bg-white">
-                  <Picker
-                    selectedValue={formData.dosageType}
-                    onValueChange={(itemValue) => {
-                      setFormData({...formData, dosageType: itemValue});
-                      if (itemValue !== 'Other') {
-                        setFormData(prev => ({...prev, customDosage: ''}));
-                      }
-                    }}
-                    style={{ height: 50, color: '#000000', backgroundColor: '#ffffff' }}
-                    itemStyle={{ color: '#000000', fontSize: 16, backgroundColor: '#ffffff' }}
+                <View className="relative">
+                  <TouchableOpacity
+                    className="border border-gray-300 rounded-xl p-3 flex-row justify-between items-center bg-white"
+                    onPress={() => setShowDosageDropdown(!showDosageDropdown)}
                   >
-                    {dosageOptions.map((option) => (
-                      <Picker.Item key={option} label={option} value={option} color="#000000" />
-                    ))}
-                  </Picker>
+                    <Text className="text-gray-800 text-base">
+                      {formData.dosageType}
+                    </Text>
+                    <Ionicons 
+                      name={showDosageDropdown ? "chevron-up" : "chevron-down"} 
+                      size={20} 
+                      color="#6B7280" 
+                    />
+                  </TouchableOpacity>
+                  
+                  {showDosageDropdown && (
+                    <View className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-xl mt-1 z-50 max-h-48">
+                      <ScrollView className="max-h-48">
+                        {dosageOptions.map((option) => (
+                          <TouchableOpacity
+                            key={option}
+                            className={`p-3 border-b border-gray-100 ${
+                              formData.dosageType === option ? 'bg-blue-50' : ''
+                            }`}
+                            onPress={() => {
+                              setFormData({...formData, dosageType: option});
+                              if (option !== 'Other') {
+                                setFormData(prev => ({...prev, customDosage: ''}));
+                              }
+                              setShowDosageDropdown(false);
+                            }}
+                          >
+                            <Text className={`text-base ${
+                              formData.dosageType === option ? 'text-blue-600 font-semibold' : 'text-gray-800'
+                            }`}>
+                              {option}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
                 </View>
                 
                 {formData.dosageType === 'Other' && (

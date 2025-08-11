@@ -30,6 +30,7 @@ const Hold: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [apiRecords, setApiRecords] = useState<HoldRecord[]>([]);
+  const [showingHistoryData, setShowingHistoryData] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lottieRef = useRef<LottieView>(null);
 
@@ -118,6 +119,7 @@ const Hold: React.FC = () => {
       const data = await getHoldRecords();
       setApiRecords(data);
       setShowHistory(true);
+      setShowingHistoryData(true);
     } catch (error) {
       console.error('Error fetching hold history:', error);
       Alert.alert('Error', 'Failed to fetch hold history. Please try again.');
@@ -127,20 +129,43 @@ const Hold: React.FC = () => {
   };
 
   // Chart data preparation
-  const chartData = {
-    labels: records.length > 0 
-      ? records.slice(-7).map((_, index) => `${index + 1}`)
-      : ['1', '2', '3', '4', '5', '6', '7'],
-    datasets: [
-      {
-        data: records.length > 0 
-          ? records.slice(-7).map(record => record.duration)
-          : [0, 0, 0, 0, 0, 0, 0],
-        color: (opacity = 1) => `rgba(17, 181, 207, ${opacity})`,
-        strokeWidth: 3,
-      },
-    ],
+  const getChartData = () => {
+    if (showingHistoryData && apiRecords.length > 0) {
+      // Use API records for history view - show all records
+      const sortedRecords = [...apiRecords].sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      
+      return {
+        labels: sortedRecords.map((_, index) => `${index + 1}`),
+        datasets: [
+          {
+            data: sortedRecords.map(record => record.duration),
+            color: (opacity = 1) => `rgba(17, 181, 207, ${opacity})`,
+            strokeWidth: 3,
+          },
+        ],
+      };
+    } else {
+      // Use local records for recent performance view
+      return {
+        labels: records.length > 0 
+          ? records.slice(-7).map((_, index) => `${index + 1}`)
+          : ['1', '2', '3', '4', '5', '6', '7'],
+        datasets: [
+          {
+            data: records.length > 0 
+              ? records.slice(-7).map(record => record.duration)
+              : [0, 0, 0, 0, 0, 0, 0],
+            color: (opacity = 1) => `rgba(17, 181, 207, ${opacity})`,
+            strokeWidth: 3,
+          },
+        ],
+      };
+    }
   };
+
+  const chartData = getChartData();
 
   const chartConfig = {
     backgroundColor: '#1f2937',
@@ -254,7 +279,9 @@ const Hold: React.FC = () => {
 
           {/* Chart */}
           <View className="mb-6">
-            <Text className="text-white text-lg font-semibold mb-3">Recent Performance</Text>
+            <Text className="text-white text-lg font-semibold mb-3">
+              {showingHistoryData ? 'All Time Performance' : 'Recent Performance'}
+            </Text>
             <LineChart
               data={chartData}
               width={screenWidth - 48}

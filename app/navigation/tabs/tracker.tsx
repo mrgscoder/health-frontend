@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +20,7 @@ const StepCounter = () => {
     6: { steps: 2800, miles: 1.4, minutes: 42, calories: 168, floors: 1 }, // Saturday
   });
 
-  const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const currentData = stepData[currentDay];
   const goalSteps = 10000;
   const progressPercentage = Math.min((currentData.steps / goalSteps) * 100, 100);
@@ -150,66 +150,79 @@ const StepCounter = () => {
   };
 
   return (
-    <View
-      className="flex-1 bg-[#A4E4DD] pt-10 px-5 items-center"
-      style={{ paddingTop: insets.top + 20 }}
+    <LinearGradient
+      colors={['#D1FAE5', '#86EFAC', '#4ADE80', '#22C55E']}
+      style={{
+        flex: 1,
+        paddingTop: insets.top + 20,
+        paddingHorizontal: 20,
+        alignItems: 'center'
+      }}
     >
-      {/* Header */}
-      <View className="flex-row items-center justify-between w-full max-w-[300px] mb-10">
-        <TouchableOpacity onPress={() => navigateDay('prev')} className="p-2">
-          <Ionicons name="chevron-back" size={24} color="teal" />
-        </TouchableOpacity>
-        <Text className="text-2xl font-semibold text-black">Today</Text>
-        <TouchableOpacity onPress={() => navigateDay('next')} className="p-2">
-          <Ionicons name="chevron-forward" size={24} color="teal" />
-        </TouchableOpacity>
-      </View>
-      {/* Progress Circle */}
-      <ProgressCircle />
-      {/* Stats Grid */}
-      <View className="flex-row flex-wrap justify-around w-full max-w-[300px] mt-10 mb-10">
-        <View className="items-center w-[45%] mb-5">
-          <FontAwesome name="map-marker" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
-          <Text className="text-2xl font-bold text-black">{currentData.miles}</Text>
-          <Text className="text-xs text-[#14b8a6]">MILES</Text>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          alignItems: 'center',
+          paddingBottom: 20
+        }}
+      >
+        {/* Header */}
+        <View className="flex-row items-center justify-between w-full max-w-[300px] mb-10">
+          <TouchableOpacity onPress={() => navigateDay('prev')} className="p-2">
+            <Ionicons name="chevron-back" size={24} color="teal" />
+          </TouchableOpacity>
+          <Text className="text-2xl font-semibold text-black">Today</Text>
+          <TouchableOpacity onPress={() => navigateDay('next')} className="p-2">
+            <Ionicons name="chevron-forward" size={24} color="teal" />
+          </TouchableOpacity>
         </View>
-        <View className="items-center w-[45%] mb-5">
-          <FontAwesome name="fire" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
-          <Text className="text-2xl font-bold text-black">{currentData.calories}</Text>
-          <Text className="text-xs text-[#14b8a6]">KCAL</Text>
+        {/* Progress Circle */}
+        <ProgressCircle />
+        {/* Stats Grid */}
+        <View className="flex-row flex-wrap justify-around w-full max-w-[300px] mt-10 mb-10">
+          <View className="items-center w-[45%] mb-5">
+            <FontAwesome name="map-marker" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+            <Text className="text-2xl font-bold text-black">{currentData.miles}</Text>
+            <Text className="text-xs text-[#14b8a6]">MILES</Text>
+          </View>
+          <View className="items-center w-[45%] mb-5">
+            <FontAwesome name="fire" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+            <Text className="text-2xl font-bold text-black">{currentData.calories}</Text>
+            <Text className="text-xs text-[#14b8a6]">KCAL</Text>
+          </View>
+          <View className="items-center w-[45%]">
+            <MaterialIcons name="timer" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+            <Text className="text-2xl font-bold text-black">{currentData.minutes}</Text>
+            <Text className="text-xs text-[#14b8a6]">MIN</Text>
+          </View>
+          <View className="items-center w-[45%]">
+            <MaterialIcons name="stairs" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
+            <Text className="text-2xl font-bold text-black">{currentData.floors}</Text>
+            <Text className="text-xs text-[#14b8a6]">FLOORS</Text>
+          </View>
         </View>
-        <View className="items-center w-[45%]">
-          <MaterialIcons name="timer" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
-          <Text className="text-2xl font-bold text-black">{currentData.minutes}</Text>
-          <Text className="text-xs text-[#14b8a6]">MIN</Text>
+        {/* Weekly Progress */}
+        <View className="flex-row justify-center items-center mb-8">
+          {dayNames.map((day, index) => (
+            <DayCircle key={day} dayIndex={index} dayName={day} />
+          ))}
         </View>
-        <View className="items-center w-[45%]">
-          <MaterialIcons name="stairs" size={24} color="#14b8a6" style={{ marginBottom: 8 }} />
-          <Text className="text-2xl font-bold text-black">{currentData.floors}</Text>
-          <Text className="text-xs text-[#14b8a6]">FLOORS</Text>
+        {/* Progress Bar */}
+        <View className="items-center w-full max-w-[300px]">
+          <Text className="text-xs text-gray-400 mb-2">
+            {progressPercentage.toFixed(1)}% of daily goal
+          </Text>
+          <View className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+            <LinearGradient
+              colors={['#14b8a6', '#0cb6ab', '#0891b2']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ height: '100%', width: `${progressPercentage}%` }}
+            />
+          </View>
         </View>
-      </View>
-      {/* Weekly Progress */}
-      <View className="flex-row justify-center items-center mb-8">
-        {dayNames.map((day, index) => (
-          <DayCircle key={day} dayIndex={index} dayName={day} />
-        ))}
-      </View>
-      {/* Progress Bar */}
-      <View className="items-center w-full max-w-[300px]">
-        <Text className="text-xs text-gray-400 mb-2">
-          {progressPercentage.toFixed(1)}% of daily goal
-        </Text>
-        <View className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-          <LinearGradient
-            colors={['#14b8a6', '#0cb6ab', '#0891b2']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ height: '100%', width: `${progressPercentage}%` }}
-          />
-        </View>
-      </View>
-    </View>
+      </ScrollView>
+    </LinearGradient>
   );
 };
 

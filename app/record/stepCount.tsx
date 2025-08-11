@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -158,7 +158,7 @@ const StepCounter = () => {
   
   // Get current day name
   const getCurrentDayName = (dayIndex: number) => {
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return dayNames[dayIndex];
   };
 
@@ -254,8 +254,8 @@ const StepCounter = () => {
         />
       </Svg>
       <View className="items-center justify-center">
-        <Text className="text-[40px] font-bold text-black mb-1">{currentSteps.toLocaleString()}</Text>
-        <Text className="text-xs text-gray-400 tracking-wider">STEPS</Text>
+        <Text className="text-[40px] font-bold text-lightblue mb-1">{currentSteps.toLocaleString()}</Text>
+        <Text className="text-xs text-lightblue tracking-wider">STEPS</Text>
       </View>
     </View>
   );
@@ -275,25 +275,14 @@ const StepCounter = () => {
             }}
           />
         </View>
-        <Text className="text-[10px] text-gray-400 mt-2">{dayName}</Text>
+        <Text className="text-[10px] text-lightblue mt-2">{dayName}</Text>
       </TouchableOpacity>
     );
   };
 
   return (
     <LinearGradient
-      colors={[
-        '#11B5CF',
-        '#0EA5BF',
-        '#0B95AF',
-        '#08859F',
-        '#05758F',
-        '#02657F',
-        '#01556F',
-        '#00455F',
-        '#00354F',
-        '#00253F',
-      ]}
+      colors={['#D1FAE5', '#86EFAC', '#4ADE80', '#22C55E']}
       className="flex-1"
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
@@ -301,16 +290,16 @@ const StepCounter = () => {
       <View className="flex-1" style={{ paddingTop: insets.top }}>
         {/* Header */}
         <View className="px-6 py-4">
-          <Text className="text-3xl font-bold text-white text-center mb-2">
+          <Text className="text-3xl font-bold text-lightblue text-center mb-2">
             Step Counter
           </Text>
-          <Text className="text-white/80 text-center text-sm">
+          <Text className="text-lightblue/80 text-center text-sm">
             Track your daily activity and stay motivated
           </Text>
         </View>
 
         {/* Main Content */}
-        <View className="flex-1 px-6">
+        <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
           {/* Progress Circle */}
           <View className="items-center mb-8">
             <ProgressCircle />
@@ -318,32 +307,32 @@ const StepCounter = () => {
 
           {/* Current Day Stats */}
           <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
-            <Text className="text-xl font-semibold text-white mb-4 text-center">
+            <Text className="text-xl font-semibold text-lightblue mb-4 text-center">
               Today's Progress
             </Text>
             <View className="flex-row justify-between">
               <View className="items-center">
-                <Text className="text-2xl font-bold text-white">{getCurrentDayData().steps}</Text>
-                <Text className="text-white/80 text-sm">Steps</Text>
+                <Text className="text-2xl font-bold text-lightblue">{getCurrentDayData().steps}</Text>
+                <Text className="text-lightblue/80 text-sm">Steps</Text>
               </View>
               <View className="items-center">
-                <Text className="text-2xl font-bold text-white">{getCurrentDayData().miles}</Text>
-                <Text className="text-white/80 text-sm">Miles</Text>
+                <Text className="text-2xl font-bold text-lightblue">{getCurrentDayData().miles}</Text>
+                <Text className="text-lightblue/80 text-sm">Miles</Text>
               </View>
               <View className="items-center">
-                <Text className="text-2xl font-bold text-white">{getCurrentDayData().calories}</Text>
-                <Text className="text-white/80 text-sm">Calories</Text>
+                <Text className="text-2xl font-bold text-lightblue">{getCurrentDayData().calories}</Text>
+                <Text className="text-lightblue/80 text-sm">Calories</Text>
               </View>
               <View className="items-center">
-                <Text className="text-2xl font-bold text-white">{getCurrentDayData().minutes}</Text>
-                <Text className="text-white/80 text-sm">Minutes</Text>
+                <Text className="text-2xl font-bold text-lightblue">{getCurrentDayData().minutes}</Text>
+                <Text className="text-lightblue/80 text-sm">Minutes</Text>
               </View>
             </View>
           </View>
 
           {/* Weekly Overview */}
           <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
-            <Text className="text-xl font-semibold text-white mb-4 text-center">
+            <Text className="text-xl font-semibold text-lightblue mb-4 text-center">
               Weekly Overview
             </Text>
             <View className="flex-row justify-between">
@@ -365,7 +354,7 @@ const StepCounter = () => {
             >
               <Ionicons name="chevron-back" size={24} color="white" />
             </TouchableOpacity>
-            <Text className="text-lg font-semibold text-white">
+            <Text className="text-lg font-semibold text-lightblue">
               {getCurrentDayName(currentDay)}
             </Text>
             <TouchableOpacity
@@ -377,29 +366,29 @@ const StepCounter = () => {
           </View>
 
           {/* Status */}
-          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
-            <Text className="text-lg font-semibold text-white mb-3 text-center">
+          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
+            <Text className="text-lg font-semibold text-lightblue mb-3 text-center">
               Pedometer Status
             </Text>
             {isPedometerAvailable === null ? (
-              <Text className="text-white/80 text-center">Checking availability...</Text>
+              <Text className="text-lightblue/80 text-center">Checking availability...</Text>
             ) : isPedometerAvailable ? (
               <View className="items-center">
                 <Ionicons name="checkmark-circle" size={48} color="#4ade80" />
-                <Text className="text-white/80 text-center mt-2">
+                <Text className="text-lightblue/80 text-center mt-2">
                   Pedometer is available and tracking steps
                 </Text>
               </View>
             ) : (
               <View className="items-center">
                 <Ionicons name="close-circle" size={48} color="#ef4444" />
-                <Text className="text-white/80 text-center mt-2">
+                <Text className="text-lightblue/80 text-center mt-2">
                   {pedometerError || 'Pedometer is not available on this device'}
                 </Text>
               </View>
             )}
           </View>
-        </View>
+        </ScrollView>
       </View>
     </LinearGradient>
   );

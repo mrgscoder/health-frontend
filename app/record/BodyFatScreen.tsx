@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Keyboard, ScrollView, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -10,31 +11,160 @@ import BASE_URL from '../../src/config';
 interface BodyFatRecord {
   id: number;
   bodyFat: number;
-  weightKg: number;
   date_time: string;
   bmi: number;
   notes?: string;
 }
 
+interface CalculationResult {
+  bodyFat: number;
+  bmi: number;
+  category: string;
+  color: string;
+  textColor: string;
+}
+
 export default function BodyFatScreen() {
-  const [weight, setWeight] = useState('');
-  const [height, setHeight] = useState('');
-  const [age, setAge] = useState('');
   const [neck, setNeck] = useState('');
   const [waist, setWaist] = useState('');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
+  const [hip, setHip] = useState('');
+  const [userGender, setUserGender] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({ visible: false, message: '', error: false });
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyRecords, setHistoryRecords] = useState<BodyFatRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  
   const router = useRouter();
 
   const API_URL = `${BASE_URL}/api/bodyfat/calculate`;
 
+  // Fetch user profile to get gender
+  const fetchUserProfile = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const response = await axios.get(`${BASE_URL}/api/user-form/user-form`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success && response.data.data) {
+        setUserGender(response.data.data.gender);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  // Initialize calculation result with safe defaults
+  const getSafeCalculationResult = () => {
+    if (!calculationResult) {
+      return {
+        bodyFat: 0,
+        bmi: 0,
+        category: 'Unknown',
+        color: '#f3f4f6',
+        textColor: '#6b7280'
+      };
+    }
+    
+    // Ensure all properties are safe
+    return {
+      bodyFat: Number(calculationResult.bodyFat) || 0,
+      bmi: Number(calculationResult.bmi) || 0,
+      category: String(calculationResult.category || 'Unknown'),
+      color: String(calculationResult.color || '#f3f4f6'),
+      textColor: String(calculationResult.textColor || '#6b7280')
+    };
+  };
+
+  // Categorize body fat percentage
+  const categorizeBodyFat = (bodyFat: number | undefined, gender: 'male' | 'female') => {
+    console.log('Categorizing body fat:', { bodyFat, gender });
+    
+    if (!bodyFat || isNaN(bodyFat) || typeof bodyFat !== 'number') {
+      console.log('Invalid body fat value:', bodyFat);
+      return { 
+        category: String('Invalid'), 
+        color: String('#f3f4f6'), 
+        textColor: String('#6b7280') 
+      };
+    }
+    
+    let result;
+    if (gender === 'male') {
+      if (bodyFat < 6) {
+        result = { category: 'Essential Fat', color: '#bfdbfe', textColor: '#1d4ed8' };
+      } else if (bodyFat < 14) {
+        result = { category: 'Athletes', color: '#bbf7d0', textColor: '#15803d' };
+      } else if (bodyFat < 18) {
+        result = { category: 'Fitness', color: '#dcfce7', textColor: '#16a34a' };
+      } else if (bodyFat < 25) {
+        result = { category: 'Average', color: '#fef3c7', textColor: '#a16207' };
+      } else if (bodyFat < 32) {
+        result = { category: 'Above Average', color: '#fed7aa', textColor: '#c2410c' };
+      } else {
+        result = { category: 'Obese', color: '#fecaca', textColor: '#b91c1c' };
+      }
+    } else {
+      if (bodyFat < 14) {
+        result = { category: 'Essential Fat', color: '#bfdbfe', textColor: '#1d4ed8' };
+      } else if (bodyFat < 21) {
+        result = { category: 'Athletes', color: '#bbf7d0', textColor: '#15803d' };
+      } else if (bodyFat < 25) {
+        result = { category: 'Fitness', color: '#dcfce7', textColor: '#16a34a' };
+      } else if (bodyFat < 32) {
+        result = { category: 'Average', color: '#fef3c7', textColor: '#a16207' };
+      } else if (bodyFat < 38) {
+        result = { category: 'Above Average', color: '#fed7aa', textColor: '#c2410c' };
+      } else {
+        result = { category: 'Obese', color: '#fecaca', textColor: '#b91c1c' };
+      }
+    }
+    
+    // Ensure all values are strings
+    return {
+      category: String(result.category),
+      color: String(result.color),
+      textColor: String(result.textColor)
+    };
+  };
+
   const handleSubmit = async () => {
-    if (!weight || !height || !age || !neck || !waist) {
-      setSnackbar({ visible: true, message: 'Fill in all fields.', error: true });
+    if (!neck || !waist) {
+      setSnackbar({ visible: true, message: 'Fill in all required fields.', error: true });
+      return;
+    }
+
+    if (userGender === 'female' && !hip) {
+      setSnackbar({ visible: true, message: 'Hip measurement is required for females.', error: true });
+      return;
+    }
+
+    // Validate input values
+    const neckVal = parseFloat(neck);
+    const waistVal = parseFloat(waist);
+    const hipVal = userGender === 'female' ? parseFloat(hip) : 0;
+
+    if (isNaN(neckVal) || isNaN(waistVal) || (userGender === 'female' && isNaN(hipVal))) {
+      setSnackbar({ visible: true, message: 'Please enter valid numbers.', error: true });
+      return;
+    }
+
+    if (neckVal <= 0 || waistVal <= 0 || (userGender === 'female' && hipVal <= 0)) {
+      setSnackbar({ visible: true, message: 'All values must be greater than 0.', error: true });
+      return;
+    }
+
+    if (waistVal <= neckVal) {
+      setSnackbar({ visible: true, message: 'Waist measurement must be greater than neck measurement.', error: true });
       return;
     }
 
@@ -47,31 +177,77 @@ export default function BodyFatScreen() {
         return;
       }
 
+      const requestData = {
+        neckCm: neckVal,
+        waistCm: waistVal,
+        ...(userGender === 'female' && { hipCm: hipVal })
+      };
+
+      console.log('Sending body fat calculation request:', requestData);
+      console.log('API URL:', API_URL);
+
       const response = await axios.post(
         API_URL,
-        {
-          weightKg: parseFloat(weight),
-          heightCm: parseFloat(height),
-          neckCm: parseFloat(neck),
-          waistCm: parseFloat(waist),
-          age: parseInt(age),
-          gender,
-        },
+        requestData,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      setSnackbar({ visible: true, message: 'Body fat calculated & saved!', error: false });
-      setWeight('');
-      setHeight('');
-      setAge('');
+      console.log('Response received:', response.data);
+
+      // Check if response has the expected structure
+      const bodyFat = response.data.data?.bodyFat || response.data.bodyFat;
+      const bmi = response.data.data?.bmi || response.data.bmi;
+      
+      console.log('Extracted bodyFat:', bodyFat);
+      console.log('Extracted bmi:', bmi);
+
+      if (!bodyFat || !bmi) {
+        console.error('Invalid response structure:', response.data);
+        setSnackbar({ visible: true, message: 'Invalid response from server.', error: true });
+        return;
+      }
+
+      // Set calculation result
+      const result = categorizeBodyFat(bodyFat, userGender as 'male' | 'female' || 'male');
+      setCalculationResult({
+        bodyFat: bodyFat,
+        bmi: bmi,
+        category: result.category,
+        color: result.color,
+        textColor: result.textColor
+      });
+      setShowResults(true);
+
+      // Auto-hide results after 8 seconds
+      setTimeout(() => setShowResults(false), 8000);
+
       setNeck('');
       setWaist('');
+      setHip('');
       Keyboard.dismiss();
-    } catch (err) {
-      console.error(err);
-      setSnackbar({ visible: true, message: 'Failed to save. Try again.', error: true });
+    } catch (err: any) {
+      console.error('Body fat calculation error:', err);
+      let errorMessage = 'Failed to save. Try again.';
+      
+      if (err.response) {
+        // Server responded with error status
+        if (err.response.status === 400) {
+          errorMessage = err.response.data?.error || 'Invalid input data.';
+        } else if (err.response.status === 401) {
+          errorMessage = 'Authentication required. Please log in again.';
+        } else if (err.response.status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else {
+          errorMessage = err.response.data?.error || 'Request failed.';
+        }
+      } else if (err.request) {
+        // Network error
+        errorMessage = 'Network error. Check your connection.';
+      }
+      
+      setSnackbar({ visible: true, message: errorMessage, error: true });
     } finally {
       setLoading(false);
     }
@@ -118,52 +294,39 @@ export default function BodyFatScreen() {
   };
 
   return (
-    <LinearGradient colors={['#dbe6f6', '#f5f7fa']} style={styles.container}>
+    <LinearGradient colors={['#e3f2fd', '#fce4ec']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView style={styles.scrollView}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Body Fat Calculator</Text>
           </View>
+          
+          {/* AI Image Analysis Button */}
+          <View style={styles.aiButtonContainer}>
+            <TouchableOpacity
+              style={styles.aiButton}
+              onPress={() => router.push('/record/AIBodyFatAnalysis')}
+            >
+              <Text style={styles.aiButtonText}>AI Body Fat Analysis</Text>
+              <Text style={styles.aiButtonSubtext}>Take full body photo or upload image for AI analysis</Text>
+              <View style={styles.cameraIconContainer}>
+                <MaterialCommunityIcons name="camera" size={32} color="#000000" />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Profile Status */}
+          {!userGender && (
+            <View style={styles.profileWarning}>
+              <Text style={styles.profileWarningText}>
+                ⚠️ Please complete your profile to use the body fat calculator
+              </Text>
+            </View>
+          )}
 
           {/* Input Form */}
           <View style={styles.formContainer}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Weight (kg)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 70"
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="numeric"
-                maxLength={5}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Height (cm)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 175"
-                value={height}
-                onChangeText={setHeight}
-                keyboardType="numeric"
-                maxLength={3}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Age</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 30"
-                value={age}
-                onChangeText={setAge}
-                keyboardType="numeric"
-                maxLength={3}
-              />
-            </View>
-
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Neck (cm)</Text>
               <TextInput
@@ -188,35 +351,19 @@ export default function BodyFatScreen() {
               />
             </View>
 
-            <View style={styles.genderContainer}>
-              <Text style={styles.inputLabel}>Gender</Text>
-              <View style={styles.genderButtons}>
-                <TouchableOpacity
-                  style={[
-                    styles.genderButton,
-                    gender === 'male' && styles.genderButtonActive
-                  ]}
-                  onPress={() => setGender('male')}
-                >
-                  <Text style={[
-                    styles.genderButtonText,
-                    gender === 'male' && styles.genderButtonTextActive
-                  ]}>Male</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.genderButton,
-                    gender === 'female' && styles.genderButtonActive
-                  ]}
-                  onPress={() => setGender('female')}
-                >
-                  <Text style={[
-                    styles.genderButtonText,
-                    gender === 'female' && styles.genderButtonTextActive
-                  ]}>Female</Text>
-                </TouchableOpacity>
+            {userGender === 'female' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Hip (cm)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 95"
+                  value={hip}
+                  onChangeText={setHip}
+                  keyboardType="numeric"
+                  maxLength={4}
+                />
               </View>
-            </View>
+            )}
 
             <TouchableOpacity
               style={styles.submitButton}
@@ -228,6 +375,31 @@ export default function BodyFatScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Results Display */}
+          {showResults && calculationResult && calculationResult.bodyFat && calculationResult.bmi && (
+            <View style={styles.resultsContainer}>
+              <View style={styles.resultsHeader}>
+                <Text style={styles.resultsTitle}>Calculation Complete!</Text>
+              </View>
+              <View style={styles.resultsContent}>
+                <Text style={styles.resultsText}>
+                  Your body fat percentage is:
+                </Text>
+                <Text style={styles.bodyFatValue}>
+                  {typeof calculationResult.bodyFat === 'number' ? calculationResult.bodyFat.toFixed(1) : calculationResult.bodyFat}%
+                </Text>
+                <View style={[styles.categoryContainer, { backgroundColor: calculationResult.color }]}>
+                  <Text style={[styles.categoryText, { color: calculationResult.textColor }]}>
+                    {calculationResult.category}
+                  </Text>
+                </View>
+                <Text style={styles.bmiText}>
+                  BMI: {typeof calculationResult.bmi === 'number' ? calculationResult.bmi.toFixed(1) : calculationResult.bmi}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* View History Button */}
           <View style={styles.historyButtonContainer}>
@@ -251,18 +423,26 @@ export default function BodyFatScreen() {
                   <Text style={styles.emptyHistoryText}>No history records found</Text>
                 </View>
               ) : (
-                historyRecords.map((record) => (
-                  <View key={record.id} style={styles.historyItem}>
-                    <View style={styles.historyItemHeader}>
-                      <View style={styles.historyItemMain}>
-                        <Text style={styles.historyItemTitle}>
-                          {record.bodyFat.toFixed(1)}% Body Fat
-                        </Text>
-                        <Text style={styles.historyItemDate}>{formatDate(record.date_time)}</Text>
+                historyRecords.map((record) => {
+                  const result = categorizeBodyFat(record.bodyFat, userGender as 'male' | 'female' || 'male');
+                  return (
+                    <View key={record.id} style={styles.historyItem}>
+                      <View style={styles.historyItemHeader}>
+                        <View style={styles.historyItemMain}>
+                          <Text style={styles.historyItemTitle}>
+                            {typeof record.bodyFat === 'number' ? record.bodyFat.toFixed(1) : record.bodyFat}% Body Fat
+                          </Text>
+                          <Text style={styles.historyItemDate}>{formatDate(record.date_time)}</Text>
+                        </View>
+                        <View style={[styles.categoryBadge, { backgroundColor: result.color }]}>
+                          <Text style={[styles.categoryBadgeText, { color: result.textColor }]}>
+                            {result.category}
+                          </Text>
+                        </View>
                       </View>
                       <View style={styles.historyItemDetails}>
                         <Text style={styles.historyItemDetail}>
-                          Weight: {record.weightKg}kg | BMI: {record.bmi}
+                          BMI: {typeof record.bmi === 'number' ? record.bmi.toFixed(1) : record.bmi}
                         </Text>
                         {record.notes && (
                           <Text style={styles.historyItemDetail}>
@@ -271,8 +451,8 @@ export default function BodyFatScreen() {
                         )}
                       </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           )}
@@ -314,76 +494,102 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1f2937',
   },
+  aiButtonContainer: {
+    margin: 16,
+    marginBottom: 0,
+    zIndex: 2,
+  },
+  aiButton: {
+    backgroundColor: '#000000',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    position: 'relative',
+    zIndex: 2,
+  },
+  aiButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  aiButtonSubtext: {
+    fontSize: 12,
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: -15,
+    alignSelf: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#000000',
+  },
+  cameraIcon: {
+    fontSize: 36,
+  },
+  profileWarning: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+  },
+  profileWarningText: {
+    color: '#92400e',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
   formContainer: {
     margin: 8,
-    padding: 24,
+    padding: 16,
     borderRadius: 16,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   inputLabel: {
     color: '#6b7280',
     marginBottom: 8,
-    fontSize: 16,
+    fontSize: 14,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#000',
     borderRadius: 8,
-    padding: 16,
-    fontSize: 18,
-    backgroundColor: 'transparent',
-  },
-  genderContainer: {
-    marginBottom: 24,
-  },
-  genderButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  genderButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-  },
-  genderButtonActive: {
-    backgroundColor: '#000',
-  },
-  genderButtonText: {
+    padding: 12,
     fontSize: 16,
-    color: '#000',
-    fontWeight: '600',
-  },
-  genderButtonTextActive: {
-    color: '#fff',
+    backgroundColor: '#ffffff',
   },
   submitButton: {
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     borderRadius: 16,
     padding: 12,
     alignItems: 'center',
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
   },
   historyButtonContainer: {
     margin: 16,
   },
   historyButton: {
-    backgroundColor: '#000',
+    backgroundColor: '#000000',
     borderRadius: 16,
     padding: 12,
     alignItems: 'center',
   },
   historyButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
   },
   historyContainer: {
@@ -454,6 +660,63 @@ const styles = StyleSheet.create({
   snackbarText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  resultsContainer: {
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#000',
+    marginBottom: 32,
+  },
+  resultsHeader: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  resultsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  resultsContent: {
+    alignItems: 'center',
+  },
+  resultsText: {
+    fontSize: 16,
+    color: '#343a40',
+    marginBottom: 5,
+  },
+  bodyFatValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 10,
+  },
+  categoryContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
+  categoryText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bmiText: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginTop: 10,
+  },
+  categoryBadge: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    alignSelf: 'center',
+    marginTop: 10,
+  },
+  categoryBadgeText: {
+    fontSize: 14,
     fontWeight: '600',
   },
 });

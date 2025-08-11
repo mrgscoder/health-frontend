@@ -453,18 +453,7 @@ const Water = () => {
 
   return (
     <LinearGradient
-      colors={[
-        '#11B5CF',
-        '#0EA5BF',
-        '#0B95AF',
-        '#08859F',
-        '#05758F',
-        '#02657F',
-        '#01556F',
-        '#00455F',
-        '#00354F',
-        '#00253F',
-      ]}
+      colors={['#E0F7FA', '#B2EBF2', '#4DD0E1', '#00ACC1']}
       className="flex-1"
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
@@ -473,13 +462,13 @@ const Water = () => {
         <View className="p-4">
         {/* Header with streak */}
         <View className="items-center mt-4">
-          <Text className="text-3xl text-bold text-center text-white mb-2 mt-3">
+          <Text className="text-3xl text-bold text-center text-black mb-2 mt-3">
              AquaTracker
           </Text>
           {streak > 0 && (
             <View className="bg-yellow-100/20 backdrop-blur-sm px-4 py-2 rounded-full flex-row items-center">
-              <MaterialCommunityIcons name="fire" size={20} color="#ffffff" style={{ marginRight: 4 }} />
-              <Text className="text-white font-semibold">
+              <MaterialCommunityIcons name="fire" size={20} color="#2196F3" style={{ marginRight: 4 }} />
+              <Text className="text-black font-semibold">
                 {streak} day streak!
               </Text>
             </View>
@@ -488,7 +477,7 @@ const Water = () => {
 
         {/* Motivational Message - moved to top */}
         <View className="rounded-2xl mt-1">
-          <Text className="text-base text-sm text-white/80 italic text-center">
+          <Text className="text-base text-sm text-black/80 italic text-center">
             {message}
           </Text>
         </View>
@@ -496,24 +485,24 @@ const Water = () => {
         {/* Achievement Celebration */}
         {showCelebration && currentAchievement && (
           <View className="bg-yellow-50/20 backdrop-blur-sm border-2 border-yellow-200/30 rounded-2xl p-4 mt-4 items-center">
-            <MaterialCommunityIcons name={currentAchievement.icon} size={36} color="#ffffff" />
-            <Text className="text-lg font-semibold text-white text-center mt-2">
+            <MaterialCommunityIcons name={currentAchievement.icon} size={36} color="#2196F3" />
+            <Text className="text-lg font-semibold text-black text-center mt-2">
               {currentAchievement.message}
             </Text>
           </View>
         )}
   
         {/* Current Status */}
-        <View className="bg-white/10 backdrop-blur-sm rounded-3xl p-3 mt-3 shadow-sm">
+        <View className="bg-white rounded-3xl p-3 mt-3 shadow-sm">
           <View className="flex-row items-center justify-center mb-2">
             <MaterialCommunityIcons name={hydrationStatus.icon} size={28} color={hydrationStatus.color} style={{ marginRight: 8 }} />
-            <Text className="text-lg font-semibold text-white">
+            <Text className="text-lg font-semibold text-black">
               {hydrationStatus.status}
             </Text>
           </View>
           
           <View className="items-center">
-            <Text className="text-base font-semibold text-white mb-1">
+            <Text className="text-base font-semibold text-black mb-1">
               Progress: {waterDrank} ml / {waterGoal} ml
             </Text>
             <Progress.Bar
@@ -525,13 +514,13 @@ const Water = () => {
               borderWidth={0}
               borderRadius={10}
             />
-            <Text className="text-xs text-white/80 mt-1">
+            <Text className="text-xs text-black/80 mt-1">
               {Math.floor(waterDrank / 250)} of {glasses} glasses ({Math.round(progress * 100)}%)
             </Text>
-             <Text className="text-sm text-white mt-3 text-center">
-             Daily Goal: <Text className="font-semibold text-white">{waterGoal} ml</Text>
+             <Text className="text-sm text-black mt-3 text-center">
+             Daily Goal: <Text className="font-semibold text-black">{waterGoal} ml</Text>
           </Text>
-          <Text className="text-xs text-white/80 text-center mt-1">
+          <Text className="text-xs text-black/80 text-center mt-1">
             That's about {glasses} glasses of water
           </Text>
           </View>
@@ -539,7 +528,7 @@ const Water = () => {
 
         {/* Cup Size Options */}
    
-          <Text className="text-lg font-semibold text-white mt-4 mb-1 text-center">
+          <Text className="text-lg font-semibold text-black mt-4 mb-1 text-center">
              Add Water Intake
           </Text>
           <View className="flex-row flex-wrap justify-center">
@@ -550,8 +539,8 @@ const Water = () => {
                 className="border-2 border-white/30 rounded-xl p-3 m-1 items-center bg-white/10 backdrop-blur-sm"
                 style={{ width: (width - 80) / 3 - 8 }}
               >
-                <MaterialCommunityIcons name={cup.icon} size={28} color="#ffffff" style={{ marginBottom: 4 }} />
-                <Text className="text-xs font-semibold text-white">{cup.size}ml</Text>
+                <MaterialCommunityIcons name={cup.icon} size={28} color="#2196F3" style={{ marginBottom: 4 }} />
+                <Text className="text-xs font-semibold text-black">{cup.size}ml</Text>
            
               </TouchableOpacity>
             ))}
@@ -559,13 +548,13 @@ const Water = () => {
        
 
         {/* Smart Reminders */}
-        <View className="bg-white/10 backdrop-blur-sm rounded-3xl p-4 mt-4 shadow-sm">
-          <Text className="text-xl text-white font-semibold text-center mb-3">
+        <View className="bg-white rounded-3xl p-4 mt-4 shadow-sm">
+          <Text className="text-xl text-black font-semibold text-center mb-3">
             Smart Reminders
           </Text>
           
           <View className="flex-row items-center justify-center mb-3">
-            <Text className="text-sm text-white/80 mr-2">
+            <Text className="text-sm text-black/80 mr-2">
               {remindersEnabled ? 'On' : 'Off'}
             </Text>
             <Switch
@@ -578,17 +567,17 @@ const Water = () => {
           
           {remindersEnabled ? (
             <>
-              <Text className="text-base text-white/80 text-center">
+              <Text className="text-base text-black/80 text-center">
                 {getTimeUntilNextReminder()}
               </Text>
               {lastDrinkTime && (
-                <Text className="text-sm text-white/60 text-center mt-2">
+                <Text className="text-sm text-black/60 text-center mt-2">
                   Last drink: {lastDrinkTime.toLocaleTimeString()}
                 </Text>
               )}
             </>
           ) : (
-            <Text className="text-base text-white/60 text-center italic">
+            <Text className="text-base text-black/60 text-center italic">
               Reminders are currently disabled
             </Text>
           )}
@@ -596,30 +585,30 @@ const Water = () => {
 
         {/* Quick Stats */}
         
-          <Text className="text-lg font-semibold text-white mb-3 text-center mt-8">
-            <MaterialCommunityIcons name="chart-bar" size={20} color="#ffffff" /> Today's Stats
+          <Text className="text-lg font-semibold text-black mb-3 text-center mt-8">
+            <MaterialCommunityIcons name="chart-bar" size={20} color="#2196F3" /> Today's Stats
           </Text>
           <View className="flex-row justify-around">
             <View className="items-center">
-              <MaterialCommunityIcons name="cup" size={29} color="#ffffff" />
-              <Text className="text-lg font-semibold text-white">
-                {Math.floor(waterDrank / 250)}
-              </Text>
-              <Text className="text-sm text-white/80">Glasses</Text>
+                              <MaterialCommunityIcons name="cup" size={29} color="#2196F3" />
+                <Text className="text-lg font-semibold text-black">
+                  {Math.floor(waterDrank / 250)}
+                </Text>
+                <Text className="text-sm text-black/80">Glasses</Text>
             </View>
             <View className="items-center">
-              <MaterialCommunityIcons name="target" size={29} color="#ffffff" />
-              <Text className="text-lg font-semibold text-white">
-                {Math.round(progress * 100)}%
-              </Text>
-              <Text className="text-sm text-white/80">Complete</Text>
+                              <MaterialCommunityIcons name="target" size={29} color="#2196F3" />
+                <Text className="text-lg font-semibold text-black">
+                  {Math.round(progress * 100)}%
+                </Text>
+                <Text className="text-sm text-black/80">Complete</Text>
             </View>
             <View className="items-center">
-              <MaterialCommunityIcons name="fire" size={29} color="#ffffff" />
-              <Text className="text-lg font-semibold text-white">
-                {streak}
-              </Text>
-              <Text className="text-sm text-white/80">Day Streak</Text>
+                              <MaterialCommunityIcons name="fire" size={29} color="#2196F3" />
+                <Text className="text-lg font-semibold text-black">
+                  {streak}
+                </Text>
+                <Text className="text-sm text-black/80">Day Streak</Text>
             </View>
           </View>
      
@@ -630,8 +619,8 @@ const Water = () => {
           className="flex-row items-center justify-center bg-red-100/20 backdrop-blur-sm border-2 border-red-300/30 rounded-xl p-3 mb-8 mt-9"
           style={{ alignSelf: 'center', width: width - 80 }}
         >
-          <MaterialCommunityIcons name="refresh" size={22} color="#ffffff" style={{ marginRight: 8 }} />
-          <Text className="text-base font-semibold text-white">Restart Day</Text>
+          <MaterialCommunityIcons name="refresh" size={22} color="#2196F3" style={{ marginRight: 8 }} />
+          <Text className="text-base font-semibold text-black">Restart Day</Text>
         </TouchableOpacity>
 
         {/* Send Reminder Button */}
@@ -662,8 +651,8 @@ const Water = () => {
           className="flex-row items-center justify-center bg-blue-100/20 backdrop-blur-sm border-2 border-blue-300/30 rounded-xl p-3 mb-8"
           style={{ alignSelf: 'center', width: width - 80 }}
         >
-          <MaterialCommunityIcons name="bell" size={22} color="#ffffff" style={{ marginRight: 8 }} />
-          <Text className="text-base font-semibold text-white">Send Reminder Now</Text>
+          <MaterialCommunityIcons name="bell" size={22} color="#2196F3" style={{ marginRight: 8 }} />
+          <Text className="text-base font-semibold text-black">Send Reminder Now</Text>
         </TouchableOpacity>
 
         </View>

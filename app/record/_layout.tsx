@@ -131,6 +131,20 @@ const _layout = () => {
         headerShown: false,
       }}
       />
+    <Stack.Screen
+      name="Analytics"
+      options={{
+        title: 'Analyze',
+        headerShown: false,
+      }}
+    />
+    <Stack.Screen
+      name="AIBodyFatAnalysis"
+      options={{
+        title: 'AI Body Fat',
+        headerShown: false,
+      }}
+    />
      </Stack>
   );
 };

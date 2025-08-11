@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BarChart } from 'react-native-chart-kit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import BASE_URL from "../../src/config";
 
 const screenWidth = Dimensions.get('window').width;
@@ -135,7 +136,7 @@ export default function CreateHistory() {
 
   return (
     <LinearGradient
-      colors={['#0f0f23', '#1a1a2e', '#16213e', '#0f3460']}
+      colors={['#0F172A', '#1E293B', '#334155', '#475569']}
       style={styles.bg}
     >
       <ScrollView 
@@ -147,7 +148,10 @@ export default function CreateHistory() {
         <Text style={styles.title}>Your Weekly Sleep Summary</Text>
 
         {loading && (
-          <Text style={styles.loadingText}>⏳ Loading sleep data...</Text>
+          <View style={styles.loadingContainer}>
+            <Ionicons name="time-outline" size={20} color="#cbd5e1" />
+            <Text style={styles.loadingText}> Loading sleep data...</Text>
+          </View>
         )}
 
         {chartData.length > 0 ? (
@@ -191,35 +195,68 @@ export default function CreateHistory() {
           return (
             <View key={idx} style={styles.entryCard}>
               <Text style={styles.entryTitle}>Sleep Log #{idx + 1}</Text>
-              <Text style={styles.entryText}>
-                📅 Date: {entry.sleep_date && !isNaN(new Date(entry.sleep_date).getTime()) 
-                  ? new Date(entry.sleep_date).toDateString() 
-                  : entry.date && !isNaN(new Date(entry.date).getTime())
-                  ? new Date(entry.date).toDateString()
-                  : 'Invalid Date'}
-              </Text>
+              <View style={styles.entryRow}>
+                <Ionicons name="calendar-outline" size={16} color="#e2e8f0" />
+                <Text style={styles.entryText}>
+                  Date: {entry.sleep_date && !isNaN(new Date(entry.sleep_date).getTime()) 
+                    ? new Date(entry.sleep_date).toDateString() 
+                    : entry.date && !isNaN(new Date(entry.date).getTime())
+                    ? new Date(entry.date).toDateString()
+                    : 'Invalid Date'}
+                </Text>
+              </View>
               {entry.sleep_start && entry.sleep_end && !isNaN(new Date(entry.sleep_start).getTime()) && !isNaN(new Date(entry.sleep_end).getTime()) ? (
                 <>
-                  <Text style={styles.entryText}>🌙 Bedtime: {new Date(entry.sleep_start).toLocaleTimeString()}</Text>
-                  <Text style={styles.entryText}>☀️ Wake Time: {new Date(entry.sleep_end).toLocaleTimeString()}</Text>
+                  <View style={styles.entryRow}>
+                    <Ionicons name="moon-outline" size={16} color="#e2e8f0" />
+                    <Text style={styles.entryText}>Bedtime: {new Date(entry.sleep_start).toLocaleTimeString()}</Text>
+                  </View>
+                  <View style={styles.entryRow}>
+                    <Ionicons name="sunny-outline" size={16} color="#e2e8f0" />
+                    <Text style={styles.entryText}>Wake Time: {new Date(entry.sleep_end).toLocaleTimeString()}</Text>
+                  </View>
                 </>
               ) : entry.start && entry.end && !isNaN(new Date(entry.start).getTime()) && !isNaN(new Date(entry.end).getTime()) ? (
                 <>
-                  <Text style={styles.entryText}>🌙 Bedtime: {new Date(entry.start).toLocaleTimeString()}</Text>
-                  <Text style={styles.entryText}>☀️ Wake Time: {new Date(entry.end).toLocaleTimeString()}</Text>
+                  <View style={styles.entryRow}>
+                    <Ionicons name="moon-outline" size={16} color="#e2e8f0" />
+                    <Text style={styles.entryText}>Bedtime: {new Date(entry.start).toLocaleTimeString()}</Text>
+                  </View>
+                  <View style={styles.entryRow}>
+                    <Ionicons name="sunny-outline" size={16} color="#e2e8f0" />
+                    <Text style={styles.entryText}>Wake Time: {new Date(entry.end).toLocaleTimeString()}</Text>
+                  </View>
                 </>
               ) : (
                 <>
-                  <Text style={styles.entryText}>🌙 Bedtime: Invalid Time</Text>
-                  <Text style={styles.entryText}>☀️ Wake Time: Invalid Time</Text>
+                  <View style={styles.entryRow}>
+                    <Ionicons name="moon-outline" size={16} color="#e2e8f0" />
+                    <Text style={styles.entryText}>Bedtime: Invalid Time</Text>
+                  </View>
+                  <View style={styles.entryRow}>
+                    <Ionicons name="sunny-outline" size={16} color="#e2e8f0" />
+                    <Text style={styles.entryText}>Wake Time: Invalid Time</Text>
+                  </View>
                 </>
               )}
-              <Text style={styles.entryText}>🕒 Duration: {hours} hrs</Text>
+              <View style={styles.entryRow}>
+                <Ionicons name="time-outline" size={16} color="#e2e8f0" />
+                <Text style={styles.entryText}>Duration: {hours} hrs</Text>
+              </View>
               {entry.sleep_quality && (
-                <Text style={styles.entryText}>⭐ Quality: {entry.sleep_quality}</Text>
+                <View style={styles.entryRow}>
+                  <Ionicons name="star-outline" size={16} color="#e2e8f0" />
+                  <Text style={styles.entryText}>Quality: {entry.sleep_quality}</Text>
+                </View>
               )}
-              <Text style={styles.scoreText}>💤 Sleep Score: {score} / 100</Text>
-              <Text style={styles.suggestion}>💡 {suggestion}</Text>
+              <View style={styles.entryRow}>
+                <Ionicons name="bed-outline" size={16} color="#38bdf8" />
+                <Text style={styles.scoreText}>Sleep Score: {score} / 100</Text>
+              </View>
+              <View style={styles.entryRow}>
+                <Ionicons name="bulb-outline" size={16} color="#94a3b8" />
+                <Text style={styles.suggestion}>{suggestion}</Text>
+              </View>
             </View>
           );
         })}
@@ -229,14 +266,14 @@ export default function CreateHistory() {
 }
 
 const chartConfig = {
-  backgroundGradientFrom: '#1e1e2f',
-  backgroundGradientTo: '#1e1e2f',
+  backgroundGradientFrom: '#1E293B',
+  backgroundGradientTo: '#1E293B',
   color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
   labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
   barPercentage: 0.6,
   decimalPlaces: 1,
   propsForBackgroundLines: {
-    stroke: '#3b3b4f',
+    stroke: '#475569',
   },
 };
 
@@ -265,18 +302,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
   loadingText: {
     color: '#cbd5e1',
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 24,
   },
   entryCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#334155',
     padding: 18,
     borderRadius: 16,
     marginBottom: 20,
     elevation: 2,
+  },
+  entryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   entryTitle: {
     color: '#fbbf24',
