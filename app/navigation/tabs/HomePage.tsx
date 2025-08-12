@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, Dimensions, Image } from 'react-native';
 import { User, Target, Plus, TrendingUp, Calendar, Edit, MoreVertical, Flame, Bell, ArrowRight, Activity, Moon, Droplets, Utensils, Dumbbell, Scale, Heart, Thermometer, Wind, Zap, Brain, Pill, Timer, Apple, BarChart3 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import BASE_URL from '../../../src/config';
@@ -47,25 +49,26 @@ const HealthTrackerDashboard = () => {
   });
 
   const [userName, setUserName] = useState('');
+  const [userGender, setUserGender] = useState<string | null>(null);
   const [statOrder, setStatOrder] = useState<Stat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Default stat configuration
   const defaultStats: Stat[] = [
-    { id: 'medicineTracking', icon: Pill, title: 'Medicine Tracking' },
-    { id: 'calories', icon: Apple, title: 'Calories', current: goals.calories.current, target: goals.calories.target, unit: ' cal' },
-    { id: 'water', icon: Droplets, title: 'Water', current: goals.water.current, target: goals.water.target, unit: ' glasses' },
-    { id: 'steps', icon: Activity, title: 'Steps', current: goals.steps.current, target: goals.steps.target },
-    { id: 'sleep', icon: Moon, title: 'Sleep', current: goals.sleep.current, target: goals.sleep.target, unit: 'h' },
-    { id: 'bloodPressure', icon: Heart, title: 'Blood Pressure', current: goals.bloodPressure.current, target: goals.bloodPressure.target, unit: ' mmHg' },
-    { id: 'heartRate', icon: Zap, title: 'Heart Rate', current: goals.heartRate.current, target: goals.heartRate.target, unit: ' bpm' },
-    { id: 'temperature', icon: Thermometer, title: 'Temperature', current: goals.temperature.current, target: goals.temperature.target, unit: '°F' },
-    { id: 'breathRetention', icon: Timer, title: 'Breath Retention', current: goals.respiratoryRate.current, target: goals.respiratoryRate.target, unit: 's' },
-    { id: 'bloodOxygen', icon: Activity, title: 'Blood Oxygen', current: goals.bloodOxygen.current, target: goals.bloodOxygen.target, unit: '%' },
-    { id: 'cardio', icon: Dumbbell, title: 'Cardio', current: goals.bloodOxygen.current, target: goals.bloodOxygen.target, unit: '%' },
-    { id: 'bloodSugar', icon: Flame, title: 'Blood Sugar', current: goals.bloodSugar.current, target: goals.bloodSugar.target, unit: ' mg/dL' },
-    { id: 'bodyFat', icon: Scale, title: 'Body Fat', current: goals.bodyFat.current, target: goals.bodyFat.target, unit: '%' },
-    { id: 'stressAssessment', icon: Heart, title: 'Happiness Score' },
+    { id: 'medicineTracking', icon: require('../../../assets/icons/medicine.png'), title: 'Medicine' },
+    { id: 'calories', icon: require('../../../assets/icons/calories.png'), title: 'Food', current: goals.calories.current, target: goals.calories.target, unit: ' cal' },
+    { id: 'water', icon: require('../../../assets/icons/water.png'), title: 'Water', current: goals.water.current, target: goals.water.target, unit: ' glasses' },
+    { id: 'steps', icon: require('../../../assets/icons/steps.png'), title: 'Steps', current: goals.steps.current, target: goals.steps.target },
+    { id: 'sleep', icon: require('../../../assets/icons/sleep.png'), title: 'Sleep', current: goals.sleep.current, target: goals.sleep.target, unit: 'h' },
+    { id: 'bloodPressure', icon: require('../../../assets/icons/blood-pressure.png'), title: 'Blood Pressure', current: goals.bloodPressure.current, target: goals.bloodPressure.target, unit: ' mmHg' },
+    { id: 'heartRate', icon: require('../../../assets/icons/heart.png'), title: 'Heart Rate', current: goals.heartRate.current, target: goals.heartRate.target, unit: ' bpm' },
+    { id: 'temperature', icon: require('../../../assets/icons/temperature.png'), title: 'Temp', current: goals.temperature.current, target: goals.temperature.target, unit: '°F' },
+    { id: 'breathRetention', icon: require('../../../assets/icons/breath.png'), title: 'Breath Retention', current: goals.respiratoryRate.current, target: goals.respiratoryRate.target, unit: 's' },
+    { id: 'bloodOxygen', icon: require('../../../assets/icons/oxygen.png'), title: 'Blood Oxygen', current: goals.bloodOxygen.current, target: goals.bloodOxygen.target, unit: '%' },
+    { id: 'cardio', icon: require('../../../assets/icons/exercise.png'), title: 'Exercise', current: goals.bloodOxygen.current, target: goals.bloodOxygen.target, unit: '%' },
+    { id: 'bloodSugar', icon: require('../../../assets/icons/blood-sugar.png'), title: 'Blood Sugar', current: goals.bloodSugar.current, target: goals.bloodSugar.target, unit: ' mg/dL' },
+    { id: 'bodyFat', icon: require('../../../assets/icons/body-fat.png'), title: 'Body Fat', current: goals.bodyFat.current, target: goals.bodyFat.target, unit: '%' },
+    { id: 'stressAssessment', icon: require('../../../assets/icons/child.png'), title: 'Happiness' },
     { id: 'analytics', icon: BarChart3, title: 'Analytics' },
     { id: 'foodAnalytics', icon: Utensils, title: 'Food Analytics' },
   ];
@@ -191,6 +194,29 @@ const HealthTrackerDashboard = () => {
     }
   };
 
+  // Function to fetch user form data including gender
+  const fetchUserFormData = async (token: string) => {
+    try {
+      console.log('🚀 Fetching user form data...');
+      const response = await fetch(`${BASE_URL}/api/user-form/user-form`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📦 User form data:', data);
+        if (data.data && data.data.gender) {
+          console.log('✅ Setting user gender:', data.data.gender);
+          setUserGender(data.data.gender.toLowerCase());
+        }
+      } else {
+        console.log('⚠️ No user form data found or error:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching user form data:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -222,6 +248,9 @@ const HealthTrackerDashboard = () => {
             setUserName(storedName);
           }
         }
+        
+        // Fetch user form data to get gender
+        await fetchUserFormData(token);
       } catch (err: any) {
         console.error('❌ Failed to fetch user profile:', err);
         console.error('❌ Error details:', {
@@ -528,7 +557,21 @@ const HealthTrackerDashboard = () => {
                   backgroundColor: 'transparent',
                 }}
               >
-                <stat.icon size={50} color="#11B5CF" />
+                {(stat.id === 'calories' || stat.id === 'medicineTracking' || stat.id === 'water' || stat.id === 'steps' || stat.id === 'sleep' || stat.id === 'bloodPressure' || stat.id === 'heartRate' || stat.id === 'temperature' || stat.id === 'breathRetention' || stat.id === 'bloodOxygen' || stat.id === 'cardio' || stat.id === 'bloodSugar' || stat.id === 'bodyFat' || stat.id === 'stressAssessment') ? (
+                  <Image 
+                    source={stat.icon} 
+                    style={{ 
+                      width: 50, 
+                      height: 50,
+                      alignSelf: 'center',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <stat.icon size={50} color="#11B5CF" />
+                )}
               </View>
               <Text className="text-sm font-semibold text-gray-700 text-center mb-1">
                 {stat.title}
@@ -549,16 +592,16 @@ const HealthTrackerDashboard = () => {
     <SafeAreaView className="flex-1">
       <LinearGradient
         colors={[
-          '#11B5CF',
-          '#0EA5BF',
-          '#0B95AF',
-          '#08859F',
-          '#05758F',
-          '#02657F',
-          '#01556F',
-          '#00455F',
-          '#00354F',
-          '#00253F',
+          '#FFFFFF',
+          '#F8FFFF',
+          '#F0FFFF',
+          '#E8FFFF',
+          '#E0FFFF',
+          '#D8FFFF',
+          '#D0FFFF',
+          '#C8FFFF',
+          '#C0FFFF',
+          '#B8FFFF',
         ]}
         style={{ flex: 1 }}
       >
@@ -567,12 +610,12 @@ const HealthTrackerDashboard = () => {
             <View className="flex-1 max-w-[1200px] self-center w-full" style={{ borderRadius: 24, overflow: 'hidden' }}>
               {/* Header */}
               <View className="">
-                <View className="px-6 py-5">
+                <View className="px-6 py-5 mt-4">
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center">
                       <TouchableOpacity
                         onPress={() => router.push('/health/profile')}
-                        className="w-12 h-12 rounded-full items-center justify-center mr-4 shadow-lg"
+                        className="w-16 h-16 rounded-full items-center justify-center mr-4 shadow-lg"
                         style={{
                           backgroundColor: 'white',
                           shadowColor: '#000',
@@ -583,13 +626,35 @@ const HealthTrackerDashboard = () => {
                         }}
                         activeOpacity={0.7}
                       >
-                        <User size={24} color="#11B5CF" />
+                        {userGender === 'female' ? (
+                          <Image 
+                            source={require('../../../assets/icons/woman.png')}
+                            style={{ 
+                              width: 50, 
+                              height: 50,
+                              borderRadius: 25
+                            }}
+                            resizeMode="cover"
+                          />
+                        ) : userGender === 'male' ? (
+                          <Image 
+                            source={require('../../../assets/icons/boy.png')}
+                            style={{ 
+                              width: 50, 
+                              height: 50,
+                              borderRadius: 25
+                            }}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <User size={40} color="#11B5CF" />
+                        )}
                       </TouchableOpacity>
                       <View>
-                        <Text className="text-xl font-bold text-white">
+                        <Text className="text-xl font-bold text-gray-800">
                           {getGreeting()}, {userName ? userName : 'User'}!
                         </Text>
-                        <Text className="text-white font-medium">{formatDate(currentDate)}</Text>
+                        <Text className="text-gray-600 font-medium mb-2">{formatDate(currentDate)}</Text>
                       </View>
 
                     </View>
@@ -603,14 +668,14 @@ const HealthTrackerDashboard = () => {
                 <View className="flex-row flex-wrap justify-between">
                   {isLoading ? (
                     <View className="w-full items-center py-8">
-                      <Text className="text-white text-center text-lg">Loading your health cards...</Text>
+                      <Text className="text-gray-700 text-center text-lg">Loading your health cards...</Text>
                     </View>
                   ) : statOrder && statOrder.length > 0 ? (
                     statOrder.map((stat, index) => (
                       <DraggableStatCard key={stat.id} stat={stat} index={index} />
                     ))
                   ) : (
-                    <Text className="text-white text-center">No cards available</Text>
+                    <Text className="text-gray-700 text-center">No cards available</Text>
                   )}
                 </View>
               </View>
