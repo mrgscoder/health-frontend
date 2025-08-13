@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { View, Text, Button, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import * as Progress from 'react-native-progress';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import * as Progress from 'react-native-progress';
 
 // Define props interface for user data
 interface ResultParams {
@@ -259,7 +259,7 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
       });
     } catch (error) {
       console.error('❌ Navigation error:', error);
-      router.push('/navigation/tabs');
+      router.push({ pathname: '/navigation/tabs/food' });
     }
   };
 
