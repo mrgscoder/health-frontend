@@ -1,14 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Text, TextInput, TouchableOpacity, Alert, Image, ScrollView, SafeAreaView, StatusBar } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Activity, Camera, Image as ImageIcon, Check, AlertCircle } from 'lucide-react-native';
+import { Camera, Check, Image as ImageIcon } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Image, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import axios from 'axios';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import { useRouter } from 'expo-router';
 import BASE_URL from '../../src/config';
 
 interface CalculationResult {
@@ -27,8 +26,41 @@ export default function AIBodyFatAnalysis() {
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [showResults, setShowResults] = useState(false);
   const lottieRef = useRef<LottieView>(null);
+  const snackbarTimeoutRef = useRef<number | null>(null);
   
   const router = useRouter();
+
+  // Auto-hide snackbar after 3 seconds with cleanup
+  useEffect(() => {
+    if (snackbar.visible) {
+      snackbarTimeoutRef.current = setTimeout(() => {
+        setSnackbar(prev => ({ ...prev, visible: false }));
+      }, 3000);
+    }
+    
+    return () => {
+      if (snackbarTimeoutRef.current) {
+        clearTimeout(snackbarTimeoutRef.current);
+      }
+    };
+  }, [snackbar.visible]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (snackbarTimeoutRef.current) {
+        clearTimeout(snackbarTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Reset analysis state helper
+  const resetAnalysisState = () => {
+    setShowResults(false);
+    setCalculationResult(null);
+    setShowLottieAnimation(false);
+    setImageLoading(false);
+  };
 
   // Categorize body fat percentage
   const categorizeBodyFat = (bodyFat: number | undefined, gender: 'male' | 'female') => {
@@ -37,9 +69,9 @@ export default function AIBodyFatAnalysis() {
     if (!bodyFat || isNaN(bodyFat) || typeof bodyFat !== 'number') {
       console.log('Invalid body fat value:', bodyFat);
       return { 
-        category: String('Invalid'), 
-        color: String('#f3f4f6'), 
-        textColor: String('#6b7280') 
+        category: 'Invalid', 
+        color: '#f3f4f6', 
+        textColor: '#6b7280' 
       };
     }
     
@@ -74,11 +106,27 @@ export default function AIBodyFatAnalysis() {
       }
     }
     
-    return {
-      category: String(result.category),
-      color: String(result.color),
-      textColor: String(result.textColor)
-    };
+    return result;
+  };
+
+  // Convert image to base64 using expo-file-system for better React Native support
+  const convertToBase64 = async (uri: string): Promise<string> => {
+    try {
+      // Check if it's already base64
+      if (uri.startsWith('data:image')) {
+        return uri.split(',')[1] || uri;
+      }
+      
+      // Use FileSystem for React Native
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      return base64;
+    } catch (error) {
+      console.error('Error converting image to base64:', error);
+      throw new Error('Failed to convert image to base64');
+    }
   };
 
   // Image picker functions
@@ -113,8 +161,7 @@ export default function AIBodyFatAnalysis() {
 
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0].uri);
-        setShowResults(false);
-        setCalculationResult(null);
+        resetAnalysisState();
         setSnackbar({ visible: true, message: 'Photo captured successfully!', error: false });
       }
     } catch (error) {
@@ -136,8 +183,7 @@ export default function AIBodyFatAnalysis() {
 
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0].uri);
-        setShowResults(false);
-        setCalculationResult(null);
+        resetAnalysisState();
         setSnackbar({ visible: true, message: 'Image selected successfully!', error: false });
       }
     } catch (error) {
@@ -152,35 +198,42 @@ export default function AIBodyFatAnalysis() {
       return;
     }
 
-    setShowLottieAnimation(true);
-    console.log('Showing Lottie animation');
-
+    // Reset animation state and start fresh
+    setShowLottieAnimation(false);
     setImageLoading(true);
+    
+    // Small delay to ensure state is reset
+    setTimeout(() => {
+      setShowLottieAnimation(true);
+    }, 100);
+
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         setSnackbar({ visible: true, message: 'Authentication required.', error: true });
-        setImageLoading(false);
         return;
       }
 
-      // Convert image to base64
-      let imageBase64: string;
-      if (selectedImage.startsWith('data:image')) {
-        imageBase64 = selectedImage;
-      } else {
-        const response = await fetch(selectedImage);
-        const blob = await response.blob();
-        const reader = new FileReader();
-        
-        imageBase64 = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+      // Validate image file exists (for local URIs)
+      if (!selectedImage.startsWith('data:image')) {
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(selectedImage);
+          if (!fileInfo.exists) {
+            throw new Error('Selected image file no longer exists');
+          }
+        } catch (fileError) {
+          setSnackbar({ visible: true, message: 'Selected image is no longer available. Please select another image.', error: true });
+          return;
+        }
       }
 
-      const base64Data = imageBase64.split(',')[1] || imageBase64;
+      // Convert image to base64 using improved method
+      const base64Data = await convertToBase64(selectedImage);
+
+      // Validate base64 data
+      if (!base64Data) {
+        throw new Error('Failed to process image');
+      }
 
       const requestData = {
         imageBase64: base64Data,
@@ -192,6 +245,7 @@ export default function AIBodyFatAnalysis() {
         imageName: requestData.imageName
       });
 
+      // Add timeout to axios request
       const response = await axios.post(
         `${BASE_URL}/api/ai-bodyfat/analyze`,
         requestData,
@@ -200,6 +254,7 @@ export default function AIBodyFatAnalysis() {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
+          timeout: 30000, // 30 second timeout
         }
       );
 
@@ -212,16 +267,18 @@ export default function AIBodyFatAnalysis() {
         const categoryResult = categorizeBodyFat(result.bodyFatPercentage, result.gender);
         console.log('Category result:', categoryResult);
         
-        const calculationData = {
+        const calculationData: CalculationResult = {
           bodyFat: Number(result.bodyFatPercentage) || 0,
           bmi: 0,
-          category: String(categoryResult.category || 'Unknown'),
-          color: String(categoryResult.color || '#f3f4f6'),
-          textColor: String(categoryResult.textColor || '#6b7280')
+          category: categoryResult.category || 'Unknown',
+          color: categoryResult.color || '#f3f4f6',
+          textColor: categoryResult.textColor || '#6b7280'
         };
+        
         console.log('Setting calculation result:', calculationData);
         setCalculationResult(calculationData);
         setShowResults(true);
+        setSnackbar({ visible: true, message: 'Analysis completed successfully!', error: false });
       } else {
         throw new Error(response.data.error || 'Analysis failed');
       }
@@ -229,88 +286,102 @@ export default function AIBodyFatAnalysis() {
       console.error('AI analysis error:', error);
       let errorMessage = 'AI analysis failed. Please try again.';
       
-      if (error.response) {
-        if (error.response.status === 400) {
-          if (error.response.data?.error === 'Image not recognized as human') {
-            errorMessage = 'The image does not appear to contain a human. Please upload a clear photo of a person.';
+      if (axios.isAxiosError(error)) {
+        if (error.code === 'ECONNABORTED') {
+          errorMessage = 'Request timeout. Please check your connection and try again.';
+        } else if (error.response) {
+          const status = error.response.status;
+          const errorData = error.response.data;
+          
+          if (status === 400) {
+            if (errorData?.error === 'Image not recognized as human') {
+              errorMessage = 'The image does not appear to contain a human. Please upload a clear photo of a person.';
+            } else {
+              errorMessage = errorData?.error || 'Invalid request data.';
+            }
+          } else if (status === 401) {
+            errorMessage = 'Authentication required. Please log in again.';
+          } else if (status === 413) {
+            errorMessage = 'Image file is too large. Please select a smaller image.';
+          } else if (status === 500) {
+            errorMessage = errorData?.error || 'Server error. Please try again later.';
           } else {
-            errorMessage = error.response.data?.error || 'Invalid request data.';
+            errorMessage = errorData?.error || 'Request failed.';
           }
-        } else if (error.response.status === 401) {
-          errorMessage = 'Authentication required. Please log in again.';
-        } else if (error.response.status === 500) {
-          errorMessage = error.response.data?.error || 'Server error. Please try again later.';
-        } else {
-          errorMessage = error.response.data?.error || 'Request failed.';
+        } else if (error.request) {
+          errorMessage = 'Network error. Please check your connection.';
         }
-      } else if (error.request) {
-        errorMessage = 'Network error. Check your connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       setSnackbar({ visible: true, message: errorMessage, error: true });
     } finally {
       setImageLoading(false);
+      setShowLottieAnimation(false);
     }
   };
 
+  const removeImage = () => {
+    setSelectedImage(null);
+    resetAnalysisState();
+    setSnackbar({ visible: true, message: 'Image removed successfully!', error: false });
+  };
+
   return (
-    <LinearGradient
-      colors={['#e3f2fd', '#fce4ec']}
-      style={{ flex: 1 }}
-    >
-      <SafeAreaView className="flex-1">
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" backgroundColor="transparent" />
         <ScrollView 
-          className="flex-1"
+          style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           bounces={true}
         >
           {/* Header */}
-          <View className="flex-row items-center justify-center mt-6 mb-2 p-4 rounded-lg" style={{ backgroundColor: '#d2ff71' }}>
-            <Activity className="w-6 h-6 text-[#00b8f1] mr-8" />
-            <Text className="text-2xl font-bold text-gray-800">AI Body Fat Analysis</Text>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>AI Body Fat Analysis</Text>
           </View>
 
           {/* Upload Section */}
-          <View className="m-2 p-6 rounded-2xl border border-black">
-            <Text className="text-lg font-semibold text-gray-800 mb-2 text-center">Upload Your Photo</Text>
-            <Text className="text-gray-600 mb-6 text-center">
+          <View style={styles.uploadSection}>
+            <Text style={styles.uploadTitle}>Upload Your Photo</Text>
+            <Text style={styles.uploadSubtitle}>
               Take a full body photo or select from your gallery for AI analysis
             </Text>
             
-            <View className="flex-row justify-around items-center">
+            <View style={styles.buttonContainer}>
               <TouchableOpacity 
-                className="items-center justify-center p-3 rounded-full border-2 border-black w-24 h-24 mx-2"
-                style={{ backgroundColor: '#ffffff' }}
+                style={styles.uploadButton}
                 onPress={takePhoto}
+                disabled={imageLoading}
               >
-                <Camera className="w-8 h-8 text-black mb-1" />
-                <Text className="text-sm font-semibold text-black text-center">Take Photo</Text>
+                <Camera size={32} color="#0b0b0b" />
+                <Text style={styles.uploadButtonText}>Take Photo</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                className="items-center justify-center p-3 rounded-full border-2 border-black w-24 h-24 mx-2"
-                style={{ backgroundColor: '#ffffff' }}
+                style={styles.uploadButton}
                 onPress={pickImage}
+                disabled={imageLoading}
               >
-                <ImageIcon className="w-8 h-8 text-black mb-1" />
-                <Text className="text-sm font-semibold text-black text-center">Gallery</Text>
+                <ImageIcon size={32} color="#0b0b0b" />
+                <Text style={styles.uploadButtonText}>Gallery</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Selected Image Display */}
           {selectedImage && (
-            <View className="m-4 rounded-2xl border border-black overflow-hidden bg-gray-100">
-              <Image source={{ uri: selectedImage }} className="w-full h-80" resizeMode="contain" />
+            <View style={styles.imageContainer}>
+              <Image source={{ uri: selectedImage }} style={styles.selectedImage} resizeMode="contain" />
               
               {/* Lottie Animation Overlay */}
               {showLottieAnimation && (
-                <View className="absolute inset-0 justify-center items-center bg-black bg-opacity-50 z-10">
+                <View style={styles.lottieOverlay}>
                   <LottieView
                     ref={lottieRef}
                     source={require('../assets/lottie/body.json')}
-                    style={{ width: 384, height: 384 }}
+                    style={{ width: 384, height: 500 }}
                     autoPlay={true}
                     loop={false}
                     onAnimationFinish={() => setShowLottieAnimation(false)}
@@ -318,23 +389,22 @@ export default function AIBodyFatAnalysis() {
                 </View>
               )}
               
-              <View className="flex-row justify-around p-3 border-t border-black">
+              <View style={styles.imageActions}>
                 <TouchableOpacity
-                  className="rounded-xl p-3 px-4 items-center"
-                  style={{ backgroundColor: '#b0b6fc' }}
+                  style={[styles.actionButton, imageLoading && styles.disabledButton]}
                   onPress={analyzeImageWithAI}
                   disabled={imageLoading}
                 >
-                  <Text className="text-white text-sm font-semibold">
+                  <Text style={[styles.actionButtonText, imageLoading && styles.disabledText]}>
                     {imageLoading ? 'Analyzing...' : 'Analyze with AI'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className="rounded-xl p-3 px-4 items-center"
-                  style={{ backgroundColor: '#b0b6fc' }}
-                  onPress={() => setSelectedImage(null)}
+                  style={[styles.actionButton, imageLoading && styles.disabledButton]}
+                  onPress={removeImage}
+                  disabled={imageLoading}
                 >
-                  <Text className="text-white text-sm font-semibold">Remove</Text>
+                  <Text style={[styles.actionButtonText, imageLoading && styles.disabledText]}>Remove</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -342,30 +412,28 @@ export default function AIBodyFatAnalysis() {
 
           {/* AI Analysis Results Display */}
           {showResults && calculationResult && (
-            <View className="m-4 p-6 rounded-2xl border border-black">
-              <View className="flex-row items-center mb-3">
-                <Check className="w-5 h-5 text-green-500 mr-2" />
-                <Text className="text-lg font-semibold text-gray-800">Analysis Complete!</Text>
+            <View style={styles.resultsContainer}>
+              <View style={styles.resultsHeader}>
+                <Check size={20} color="#16a34a" />
+                <Text style={styles.resultsTitle}>Analysis Complete!</Text>
               </View>
-              <View className="items-center">
-                <Text className="text-gray-600 mb-2 text-center">
+              <View style={styles.resultsContent}>
+                <Text style={styles.resultsText}>
                   Your body fat percentage is:
                 </Text>
-                <Text className="text-4xl font-bold text-gray-800 mb-3">
+                <Text style={styles.bodyFatValue}>
                   {calculationResult.bodyFat.toFixed(1)}%
                 </Text>
                 <View 
-                  className="rounded-lg p-3 mb-2"
-                  style={{ backgroundColor: calculationResult.color }}
+                  style={[styles.categoryContainer, { backgroundColor: calculationResult.color }]}
                 >
                   <Text 
-                    className="font-bold text-center text-sm"
-                    style={{ color: calculationResult.textColor }}
+                    style={[styles.categoryText, { color: calculationResult.textColor }]}
                   >
                     {calculationResult.category}
                   </Text>
                 </View>
-                <Text className="text-sm text-gray-500 text-center italic">
+                <Text style={styles.analysisNote}>
                   Analysis completed using AI technology
                 </Text>
               </View>
@@ -373,24 +441,24 @@ export default function AIBodyFatAnalysis() {
           )}
 
           {/* Instructions */}
-          <View className="m-4 p-6 rounded-2xl border border-black mb-8">
-            <Text className="text-lg font-semibold text-gray-800 mb-4 text-center">How to get accurate results:</Text>
-            <View className="space-y-3">
-              <View className="flex-row items-center">
-                <Check className="w-5 h-5 text-green-500 mr-3" />
-                <Text className="text-gray-600 flex-1">Take a full body photo in good lighting</Text>
+          <View style={styles.instructionsContainer}>
+            <Text style={styles.instructionsTitle}>How to get accurate results:</Text>
+            <View style={styles.instructionsList}>
+              <View style={styles.instructionItem}>
+                <Check size={20} color="#16a34a" />
+                <Text style={styles.instructionText}>Take a full body photo in good lighting</Text>
               </View>
-              <View className="flex-row items-center">
-                <Check className="w-5 h-5 text-green-500 mr-3" />
-                <Text className="text-gray-600 flex-1">Wear fitted clothing or swimwear</Text>
+              <View style={styles.instructionItem}>
+                <Check size={20} color="#16a34a" />
+                <Text style={styles.instructionText}>Wear fitted clothing or swimwear</Text>
               </View>
-              <View className="flex-row items-center">
-                <Check className="w-5 h-5 text-green-500 mr-3" />
-                <Text className="text-gray-600 flex-1">Stand straight with arms slightly away from body</Text>
+              <View style={styles.instructionItem}>
+                <Check size={20} color="#16a34a" />
+                <Text style={styles.instructionText}>Stand straight with arms slightly away from body</Text>
               </View>
-              <View className="flex-row items-center">
-                <Check className="w-5 h-5 text-green-500 mr-3" />
-                <Text className="text-gray-600 flex-1">Ensure the entire body is visible in the frame</Text>
+              <View style={styles.instructionItem}>
+                <Check size={20} color="#16a34a" />
+                <Text style={styles.instructionText}>Ensure the entire body is visible in the frame</Text>
               </View>
             </View>
           </View>
@@ -399,12 +467,232 @@ export default function AIBodyFatAnalysis() {
 
       {/* Snackbar */}
       {snackbar.visible && (
-        <View className={`absolute bottom-5 left-5 right-5 p-4 rounded-lg items-center ${
-          snackbar.error ? 'bg-red-600' : 'bg-green-600'
-        }`}>
-          <Text className="text-white text-sm font-semibold">{snackbar.message}</Text>
+        <View style={[
+          styles.snackbar,
+          snackbar.error ? styles.snackbarError : styles.snackbarSuccess
+        ]}>
+          <Text style={styles.snackbarText}>{snackbar.message}</Text>
         </View>
       )}
-    </LinearGradient>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#D3CCE3',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  uploadSection: {
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#afa0cfff',
+    backgroundColor: '#ffffff',
+  },
+  uploadTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  uploadSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  uploadButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: '#afa0cfff',
+    backgroundColor: 'transparent',
+    width: 96,
+    height: 96,
+  },
+  uploadButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0b0b0b',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  imageContainer: {
+    margin: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#afa0cfff',
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+  },
+  selectedImage: {
+    width: '100%',
+    height: 320,
+  },
+  lottieOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 10,
+  },
+  imageActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#afa0cfff',
+  },
+  actionButton: {
+    borderRadius: 12,
+    padding: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#afa0cfff',
+  },
+  actionButtonText: {
+    color: '#0b0b0b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.5,
+    borderColor: '#d1d5db',
+  },
+  disabledText: {
+    color: '#9ca3af',
+  },
+  resultsContainer: {
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#afa0cfff',
+    backgroundColor: '#ffffff',
+  },
+  resultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  resultsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginLeft: 8,
+  },
+  resultsContent: {
+    alignItems: 'center',
+  },
+  resultsText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  bodyFatValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  categoryContainer: {
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  categoryText: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  analysisNote: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  instructionsContainer: {
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#afa0cfff',
+    backgroundColor: '#ffffff',
+    marginBottom: 32,
+  },
+  instructionsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  instructionsList: {
+    gap: 12,
+  },
+  instructionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#6b7280',
+    flex: 1,
+    marginLeft: 12,
+  },
+  snackbar: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  snackbarError: {
+    backgroundColor: '#dc2626',
+  },
+  snackbarSuccess: {
+    backgroundColor: '#16a34a',
+  },
+  snackbarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

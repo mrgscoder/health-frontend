@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
-import { Card, Text, Snackbar, Title, IconButton, Divider } from 'react-native-paper';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import axios from 'axios';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { Card, Divider, IconButton, Snackbar, Text, Title } from 'react-native-paper';
 import BASE_URL from '../../src/config';
 
 type BodyFatLog = {
@@ -62,7 +62,7 @@ export default function BodyFatHistory() {
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
-        <IconButton icon="scale-bathroom" size={28} color="#2563eb" />
+        <IconButton icon="scale-bathroom" size={28} iconColor="#2563eb" />
         <Title style={styles.title}>Body Fat History</Title>
       </View>
 
