@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LineChart } from 'react-native-chart-kit';
-import { Calendar, TrendingUp, AlertCircle, Check, Heart } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AlertCircle, Calendar, Check, Heart } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Dimensions, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BASE_URL from "../../src/config";
 
 interface BloodPressureRecord {
@@ -274,7 +274,7 @@ const BloodPressureTracker = () => {
 
   return (
     <LinearGradient
-      colors={['#e0f7fa', '#c8e6c9']}
+      colors={['#4CA1AF', '#4CA1AF']}
       style={{ flex: 1 }}
     >
       <SafeAreaView className="flex-1">
@@ -282,7 +282,7 @@ const BloodPressureTracker = () => {
           {/* Header */}
           <View className="flex-row items-center justify-center mt-6 mb-2">
             <Heart className="w-6 h-6 text-red-500 mr-8" />
-            <Text className="text-2xl font-bold text-gray-800">Blood Pressure</Text>
+            <Text className="text-3xl font-bold text-gray-800">Blood Pressure</Text>
           </View>
 
           {/* Input Form */}
@@ -290,7 +290,7 @@ const BloodPressureTracker = () => {
             <View className="mb-4">
               <Text className="text-gray-600 mb-2">Systolic (top number)</Text>
               <TextInput
-                className="border border-black rounded-lg p-4 text-lg bg-transparent"
+                className="border border-transparent rounded-lg p-4 text-lg bg-white"
                 placeholder="e.g., 120"
                 value={systolic}
                 onChangeText={setSystolic}
@@ -302,7 +302,7 @@ const BloodPressureTracker = () => {
             <View className="mb-4">
               <Text className="text-gray-600 mb-2">Diastolic (bottom number)</Text>
               <TextInput
-                className="border border-black rounded-lg p-4 text-lg bg-transparent"
+                className="border border-transparent rounded-lg p-4 text-lg bg-white"
                 placeholder="e.g., 80"
                 value={diastolic}
                 onChangeText={setDiastolic}
@@ -314,7 +314,7 @@ const BloodPressureTracker = () => {
             <View className="mb-6">
               <Text className="text-gray-600 mb-2">Notes (optional)</Text>
               <TextInput
-                className="border border-black rounded-lg p-4 text-lg h-20 bg-transparent"
+                className="border border-transparent rounded-lg p-4 text-lg h-20 bg-white"
                 placeholder="Add any notes..."
                 value={notes}
                 onChangeText={setNotes}
@@ -324,7 +324,8 @@ const BloodPressureTracker = () => {
             </View>
 
             <TouchableOpacity
-              className="bg-black rounded-2xl p-3 items-center"
+              className="bg-transparent rounded-2xl p-3 items-center border"
+              style={{ borderColor: '#2C3E50' }}
               onPress={recordBP}
             >
               <Text className="text-white text-lg font-semibold">Record Blood Pressure</Text>
@@ -417,21 +418,22 @@ const BloodPressureTracker = () => {
 
 
           {/* View History Button */}
-          <View className="m-4">
+          <View className="m-2">
             <TouchableOpacity
-              className="bg-black rounded-2xl p-3 items-center"
-              onPress={fetchHistory}
+              className="bg-transparent rounded-2xl p-3 items-center border mx-6"
+              style={{ borderColor: '#2C3E50' }}
+              onPress={() => { if (showHistory) { setShowHistory(false); } else { fetchHistory(); } }}
               disabled={loadingHistory}
             >
               <Text className="text-white text-lg font-semibold">
-                {loadingHistory ? 'Loading...' : 'View History'}
+                {loadingHistory ? 'Loading...' : (showHistory ? 'Hide History' : 'View History')}
               </Text>
             </TouchableOpacity>
           </View>
 
           {/* History Records */}
           {showHistory && (
-            <View className="m-4 p-6 rounded-2xl border border-black mb-8">
+            <View className="m-4 p-6 rounded-2xl border border-black mb-8 bg-white">
               <Text className="text-lg font-semibold text-gray-800 mb-4">Complete History</Text>
               {historyRecords.length === 0 ? (
                 <View className="items-center py-8">

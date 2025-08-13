@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Keyboard, ScrollView, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BASE_URL from '../../src/config';
 
 interface BodyFatRecord {
@@ -25,6 +24,13 @@ interface CalculationResult {
 }
 
 export default function BodyFatScreen() {
+  // Constants for input validation
+  const INPUT_LIMITS = {
+    MAX_LENGTH: 4,
+    MIN_VALUE: 0.1,
+    MAX_VALUE: 999.9,
+  } as const;
+
   const [neck, setNeck] = useState('');
   const [waist, setWaist] = useState('');
   const [hip, setHip] = useState('');
@@ -36,6 +42,16 @@ export default function BodyFatScreen() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isHistoryHovered, setIsHistoryHovered] = useState(false);
+  const [isSubmitHovered, setIsSubmitHovered] = useState(false);
+  
+  // Field-specific error states
+  const [neckError, setNeckError] = useState<string>('');
+  const [waistError, setWaistError] = useState<string>('');
+  const [hipError, setHipError] = useState<string>('');
+  const [formError, setFormError] = useState<string>('');
+  const snackbarTimeoutRef = useRef<number | null>(null);
   
   const router = useRouter();
 
@@ -60,30 +76,30 @@ export default function BodyFatScreen() {
   };
 
   useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  // Initialize calculation result with safe defaults
-  const getSafeCalculationResult = () => {
-    if (!calculationResult) {
-      return {
-        bodyFat: 0,
-        bmi: 0,
-        category: 'Unknown',
-        color: '#f3f4f6',
-        textColor: '#6b7280'
-      };
+    if (snackbar.visible) {
+      snackbarTimeoutRef.current = setTimeout(() => {
+        setSnackbar(prev => ({ ...prev, visible: false }));
+      }, 3000);
     }
     
-    // Ensure all properties are safe
-    return {
-      bodyFat: Number(calculationResult.bodyFat) || 0,
-      bmi: Number(calculationResult.bmi) || 0,
-      category: String(calculationResult.category || 'Unknown'),
-      color: String(calculationResult.color || '#f3f4f6'),
-      textColor: String(calculationResult.textColor || '#6b7280')
+    return () => {
+      if (snackbarTimeoutRef.current) {
+        clearTimeout(snackbarTimeoutRef.current);
+      }
     };
-  };
+  }, [snackbar.visible]);
+
+  useEffect(() => {
+    return () => {
+      if (snackbarTimeoutRef.current) {
+        clearTimeout(snackbarTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
 
   // Categorize body fat percentage
   const categorizeBodyFat = (bodyFat: number | undefined, gender: 'male' | 'female') => {
@@ -92,9 +108,9 @@ export default function BodyFatScreen() {
     if (!bodyFat || isNaN(bodyFat) || typeof bodyFat !== 'number') {
       console.log('Invalid body fat value:', bodyFat);
       return { 
-        category: String('Invalid'), 
-        color: String('#f3f4f6'), 
-        textColor: String('#6b7280') 
+        category: 'Invalid', 
+        color: '#f3f4f6', 
+        textColor: '#6b7280' 
       };
     }
     
@@ -129,51 +145,111 @@ export default function BodyFatScreen() {
       }
     }
     
-    // Ensure all values are strings
-    return {
-      category: String(result.category),
-      color: String(result.color),
-      textColor: String(result.textColor)
-    };
+    return result;
   };
 
+  // Clear individual field errors when user starts typing
+  const clearNeckError = () => setNeckError('');
+  const clearWaistError = () => setWaistError('');
+  const clearHipError = () => setHipError('');
+
+  // Clear all field errors
+  const clearFieldErrors = () => {
+    setNeckError('');
+    setWaistError('');
+    setHipError('');
+    setFormError('');
+  };
+
+  // Enhanced input validation with field-specific error setting
+  const validateInput = (value: string, fieldName: string): { isValid: boolean; error?: string } => {
+    if (!value.trim()) {
+      return { isValid: false, error: `${fieldName} is required` };
+    }
+
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) {
+      return { isValid: false, error: `${fieldName} must be a valid number` };
+    }
+
+    if (numValue < INPUT_LIMITS.MIN_VALUE) {
+      return { isValid: false, error: `${fieldName} must be at least ${INPUT_LIMITS.MIN_VALUE} cm` };
+    }
+
+    if (numValue > INPUT_LIMITS.MAX_VALUE) {
+      return { isValid: false, error: `${fieldName} cannot exceed ${INPUT_LIMITS.MAX_VALUE} cm` };
+    }
+
+    return { isValid: true };
+  };
+
+  // Validate form and set field-specific errors
+  const validateForm = (): boolean => {
+    clearFieldErrors();
+    
+    let isValid = true;
+    
+    // Validate neck
+    const neckValidation = validateInput(neck, 'Neck');
+    if (!neckValidation.isValid) {
+      setNeckError(neckValidation.error!);
+      isValid = false;
+    }
+    
+    // Validate waist
+    const waistValidation = validateInput(waist, 'Waist');
+    if (!waistValidation.isValid) {
+      setWaistError(waistValidation.error!);
+      isValid = false;
+    }
+    
+    // Validate hip for females
+    if (userGender === 'female') {
+      const hipValidation = validateInput(hip, 'Hip');
+      if (!hipValidation.isValid) {
+        setHipError(hipValidation.error!);
+        isValid = false;
+      }
+    }
+    
+    // Validate body proportions
+    if (isValid && neck && waist) {
+      const neckVal = parseFloat(neck);
+      const waistVal = parseFloat(waist);
+      
+      if (waistVal <= neckVal) {
+        setWaistError('Waist measurement should typically be larger than neck measurement');
+        isValid = false;
+      }
+      
+      if (userGender === 'female' && hip) {
+        const hipVal = parseFloat(hip);
+        if (hipVal > 0 && hipVal < waistVal) {
+          setHipError('Hip measurement should typically be larger than waist measurement for females');
+          isValid = false;
+        }
+      }
+    }
+    
+    return isValid;
+  };
+
+  // Enhanced form submission with better validation
   const handleSubmit = async () => {
-    if (!neck || !waist) {
-      setSnackbar({ visible: true, message: 'Fill in all required fields.', error: true });
-      return;
+    // Validate form using new validation function
+    if (!validateForm()) {
+      return; // Validation errors are already set by validateForm
     }
 
-    if (userGender === 'female' && !hip) {
-      setSnackbar({ visible: true, message: 'Hip measurement is required for females.', error: true });
-      return;
-    }
-
-    // Validate input values
     const neckVal = parseFloat(neck);
     const waistVal = parseFloat(waist);
     const hipVal = userGender === 'female' ? parseFloat(hip) : 0;
-
-    if (isNaN(neckVal) || isNaN(waistVal) || (userGender === 'female' && isNaN(hipVal))) {
-      setSnackbar({ visible: true, message: 'Please enter valid numbers.', error: true });
-      return;
-    }
-
-    if (neckVal <= 0 || waistVal <= 0 || (userGender === 'female' && hipVal <= 0)) {
-      setSnackbar({ visible: true, message: 'All values must be greater than 0.', error: true });
-      return;
-    }
-
-    if (waistVal <= neckVal) {
-      setSnackbar({ visible: true, message: 'Waist measurement must be greater than neck measurement.', error: true });
-      return;
-    }
 
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        setSnackbar({ visible: true, message: 'Authentication required.', error: true });
-        setLoading(false);
+        setSnackbar({ visible: true, message: 'Authentication required. Please log in again.', error: true });
         return;
       }
 
@@ -183,26 +259,18 @@ export default function BodyFatScreen() {
         ...(userGender === 'female' && { hipCm: hipVal })
       };
 
-      console.log('Sending body fat calculation request:', requestData);
-      console.log('API URL:', API_URL);
-
       const response = await axios.post(
         API_URL,
         requestData,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}` }
         }
       );
-
-      console.log('Response received:', response.data);
 
       // Check if response has the expected structure
       const bodyFat = response.data.data?.bodyFat || response.data.bodyFat;
       const bmi = response.data.data?.bmi || response.data.bmi;
       
-      console.log('Extracted bodyFat:', bodyFat);
-      console.log('Extracted bmi:', bmi);
-
       if (!bodyFat || !bmi) {
         console.error('Invalid response structure:', response.data);
         setSnackbar({ visible: true, message: 'Invalid response from server.', error: true });
@@ -220,12 +288,17 @@ export default function BodyFatScreen() {
       });
       setShowResults(true);
 
-      // Auto-hide results after 8 seconds
-      setTimeout(() => setShowResults(false), 8000);
+      // Auto-hide results after 60 seconds
+      setTimeout(() => setShowResults(false), 60000);
 
+      // Success feedback
+      setSnackbar({ visible: true, message: 'Body fat calculation completed and saved successfully!', error: false });
+
+      // Clear form and errors
       setNeck('');
       setWaist('');
       setHip('');
+      clearFieldErrors();
       Keyboard.dismiss();
     } catch (err: any) {
       console.error('Body fat calculation error:', err);
@@ -253,8 +326,15 @@ export default function BodyFatScreen() {
     }
   };
 
-  // Fetch history data
-  const fetchHistory = async () => {
+  // Toggle history display
+  const toggleHistory = async () => {
+    if (showHistory) {
+      // If history is already shown, just hide it
+      setShowHistory(false);
+      return;
+    }
+
+    // If history is not shown, fetch and display it
     try {
       setLoadingHistory(true);
       const token = await AsyncStorage.getItem('token');
@@ -294,7 +374,7 @@ export default function BodyFatScreen() {
   };
 
   return (
-    <LinearGradient colors={['#e3f2fd', '#fce4ec']} style={styles.container}>
+    <View style={[styles.container, { backgroundColor: '#D3CCE3' }]}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView style={styles.scrollView}>
           {/* Header */}
@@ -305,13 +385,18 @@ export default function BodyFatScreen() {
           {/* AI Image Analysis Button */}
           <View style={styles.aiButtonContainer}>
             <TouchableOpacity
-              style={styles.aiButton}
+              style={[
+                styles.aiButton,
+                isHovered && { backgroundColor: '#8B7BB8' }
+              ]}
               onPress={() => router.push('/record/AIBodyFatAnalysis')}
+              onPressIn={() => setIsHovered(true)}
+              onPressOut={() => setIsHovered(false)}
             >
               <Text style={styles.aiButtonText}>AI Body Fat Analysis</Text>
               <Text style={styles.aiButtonSubtext}>Take full body photo or upload image for AI analysis</Text>
               <View style={styles.cameraIconContainer}>
-                <MaterialCommunityIcons name="camera" size={32} color="#000000" />
+                <MaterialCommunityIcons name="camera" size={32} color="#ffffff" />
               </View>
             </TouchableOpacity>
           </View>
@@ -333,10 +418,15 @@ export default function BodyFatScreen() {
                 style={styles.input}
                 placeholder="e.g., 40"
                 value={neck}
-                onChangeText={setNeck}
+                onChangeText={(text) => {
+                  setNeck(text);
+                  if (neckError) clearNeckError();
+                }}
                 keyboardType="numeric"
                 maxLength={4}
+                onFocus={clearNeckError}
               />
+              {neckError && <Text style={styles.errorText}>{neckError}</Text>}
             </View>
 
             <View style={styles.inputGroup}>
@@ -345,10 +435,15 @@ export default function BodyFatScreen() {
                 style={styles.input}
                 placeholder="e.g., 85"
                 value={waist}
-                onChangeText={setWaist}
+                onChangeText={(text) => {
+                  setWaist(text);
+                  if (waistError) clearWaistError();
+                }}
                 keyboardType="numeric"
                 maxLength={4}
+                onFocus={clearWaistError}
               />
+              {waistError && <Text style={styles.errorText}>{waistError}</Text>}
             </View>
 
             {userGender === 'female' && (
@@ -358,16 +453,32 @@ export default function BodyFatScreen() {
                   style={styles.input}
                   placeholder="e.g., 95"
                   value={hip}
-                  onChangeText={setHip}
+                  onChangeText={(text) => {
+                    setHip(text);
+                    if (hipError) clearHipError();
+                  }}
                   keyboardType="numeric"
                   maxLength={4}
+                  onFocus={clearHipError}
                 />
+                {hipError && <Text style={styles.errorText}>{hipError}</Text>}
+              </View>
+            )}
+
+            {formError && (
+              <View style={styles.formErrorContainer}>
+                <Text style={styles.formErrorText}>{formError}</Text>
               </View>
             )}
 
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[
+                styles.submitButton,
+                isSubmitHovered && { backgroundColor: '#8B7BB8' }
+              ]}
               onPress={handleSubmit}
+              onPressIn={() => setIsSubmitHovered(true)}
+              onPressOut={() => setIsSubmitHovered(false)}
               disabled={loading}
             >
               <Text style={styles.submitButtonText}>
@@ -404,12 +515,17 @@ export default function BodyFatScreen() {
           {/* View History Button */}
           <View style={styles.historyButtonContainer}>
             <TouchableOpacity
-              style={styles.historyButton}
-              onPress={fetchHistory}
+              style={[
+                styles.historyButton,
+                isHistoryHovered && { backgroundColor: '#8B7BB8' }
+              ]}
+              onPress={toggleHistory}
+              onPressIn={() => setIsHistoryHovered(true)}
+              onPressOut={() => setIsHistoryHovered(false)}
               disabled={loadingHistory}
             >
               <Text style={styles.historyButtonText}>
-                {loadingHistory ? 'Loading...' : 'View History'}
+                {loadingHistory ? 'Loading...' : showHistory ? 'Hide History' : 'View History'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -468,7 +584,7 @@ export default function BodyFatScreen() {
           <Text style={styles.snackbarText}>{snackbar.message}</Text>
         </View>
       )}
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -490,7 +606,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: 'bold',
     color: '#1f2937',
   },
@@ -500,39 +616,42 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   aiButton: {
-    backgroundColor: '#000000',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    position: 'relative',
-    zIndex: 2,
-  },
+  backgroundColor: 'transparent', 
+  borderWidth: 4,                  
+  borderColor: '#afa0cfff',          
+  borderRadius: 50,
+  padding: 27,
+  alignItems: 'center',
+  position: 'relative',
+  zIndex: 2,
+},
   aiButtonText: {
-    fontSize: 18,
+    fontSize: 28,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#0b0b0bff',
     marginBottom: 4,
   },
   aiButtonSubtext: {
-    fontSize: 12,
-    color: '#ffffff',
+    fontSize: 14,
+    color: '#050505ff',
     textAlign: 'center',
   },
   cameraIconContainer: {
     position: 'absolute',
-    bottom: -15,
+    bottom: -25,
     alignSelf: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#D3CCE3',
     borderRadius: 20,
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#000000',
+    borderWidth: 3,
+    borderColor: '#afa0cfff',
   },
   cameraIcon: {
-    fontSize: 36,
+    color: '#ffffffff',
+    fontSize: 45,
   },
   profileWarning: {
     margin: 16,
@@ -568,27 +687,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   submitButton: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
     borderRadius: 16,
     padding: 12,
+    borderColor: '#afa0cfff',
+    borderWidth: 4,
     alignItems: 'center',
   },
   submitButtonText: {
-    color: '#ffffff',
+    color: '#020202ff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
   historyButtonContainer: {
     margin: 16,
   },
   historyButton: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
     borderRadius: 16,
     padding: 12,
+    borderColor: '#afa0cfff',
+    borderWidth: 4,
     alignItems: 'center',
   },
   historyButtonText: {
-    color: '#ffffff',
+    color: '#000000',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -597,7 +726,8 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#000',
+    backgroundColor: '#ffffff',
+    borderColor: 'transparent',
     marginBottom: 32,
   },
   historyTitle: {
@@ -615,14 +745,16 @@ const styles = StyleSheet.create({
   },
   historyItem: {
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: '#afa0cfff',
     paddingVertical: 16,
   },
   historyItemHeader: {
     flex: 1,
+    color: '#9ca3af',
   },
   historyItemMain: {
     flex: 1,
+    color: '#1f2937',
   },
   historyItemTitle: {
     fontSize: 18,
@@ -667,7 +799,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#000',
+    borderColor: '#ffffff',
     marginBottom: 32,
   },
   resultsHeader: {
@@ -718,5 +850,20 @@ const styles = StyleSheet.create({
   categoryBadgeText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  formErrorContainer: {
+    marginTop: 12,
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+  },
+  formErrorText: {
+    color: '#92400e',
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

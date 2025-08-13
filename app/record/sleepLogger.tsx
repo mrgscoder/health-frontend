@@ -1,20 +1,18 @@
 // SleepLoggerScreen.js — Sleep logging screen with beautiful UI
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Bed, Loader, Save, Sun } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
+  Alert,
   Button,
   ScrollView,
-  Alert
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
-import { Bed, Sun, Save, Loader } from 'lucide-react-native';
 import BASE_URL from "../../src/config";
 
 const API_BASE_URL = `${BASE_URL}/api/sleep`; // Updated API URL
@@ -76,8 +74,8 @@ export default function sleepLogger() {
         await AsyncStorage.setItem('sleepLogs', JSON.stringify(updated));
         
       } else {
-        console.error('Failed to save sleep log:', data.error);
-        Alert.alert('Error', data.error || 'Failed to save sleep log');
+        console.error('Please add correct sleep hours:', data.error);
+        Alert.alert('Error',  'Please add correct sleep hours');
       }
     } catch (error) {
       console.error('Save sleep log error:', error);
