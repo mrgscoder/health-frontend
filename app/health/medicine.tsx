@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,15 +10,18 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Vibration,
+  Switch,
+  AppState,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import LottieView from 'lottie-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
+import * as Notifications from 'expo-notifications';
 import { 
   addMedicine as addMedicineAPI, 
   getAllMedicines as getAllMedicinesAPI, 
@@ -28,6 +31,16 @@ import {
   Medicine,
   ScheduledDose
 } from '../../src/services/medicineService';
+
+// Configure notification behavior
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // Types
 interface MedicineLog {
@@ -55,10 +68,15 @@ const MedicineTracker: React.FC = () => {
   const [loadingMedicines, setLoadingMedicines] = useState(false);
   const [loadingToday, setLoadingToday] = useState(false);
   const [updatingMedicine, setUpdatingMedicine] = useState<string | null>(null);
+  const [completedDoses, setCompletedDoses] = useState<Set<string>>(new Set());
+  const [medicineAlarmsEnabled, setMedicineAlarmsEnabled] = useState(true);
+  const [medicineAlarmVibration, setMedicineAlarmVibration] = useState(true);
+  const [appState, setAppState] = useState(AppState.currentState);
+  const [isSchedulingAlarms, setIsSchedulingAlarms] = useState(false);
 
   // Date picker states
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-    const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   
   // Dosage dropdown state
   const [showDosageDropdown, setShowDosageDropdown] = useState(false);
@@ -95,6 +113,331 @@ const MedicineTracker: React.FC = () => {
     'Other'
   ];
 
+  // Auto-schedule alarms when todaySchedule or alarm settings change
+  const autoScheduleAlarms = useCallback(async () => {
+    if (!medicineAlarmsEnabled || todaySchedule.length === 0) {
+      console.log('🚫 Auto-scheduling skipped: alarms disabled or no medicines');
+      return;
+    }
+
+    try {
+      setIsSchedulingAlarms(true);
+      console.log('🔔 Auto-scheduling alarms for today...');
+      
+      // Get existing medicine notifications
+      const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+      const existingMedicineNotifications = allNotifications.filter(notification => 
+        notification.content.data?.type === 'medicine'
+      );
+
+      const now = new Date();
+      let scheduledCount = 0;
+      let cancelledCount = 0;
+
+      // First, cancel notifications for medicines that are already taken
+      for (const notification of existingMedicineNotifications) {
+        const notificationData = notification.content.data;
+        if (notificationData?.medicineId && notificationData?.time) {
+          const dose = todaySchedule.find(d => 
+            d.medicineId === notificationData.medicineId && d.time === notificationData.time
+          );
+          
+          if (dose && dose.taken === true) {
+            await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+            cancelledCount++;
+            console.log(`🔕 Cancelled alarm for ${dose.medicineName} - already taken`);
+          }
+        }
+      }
+
+      // Then schedule new alarms for medicines that need them
+      for (const dose of todaySchedule) {
+        // Skip if already taken
+        if (dose.taken === true) {
+          console.log(`⏭️ Skipping ${dose.medicineName} - already taken`);
+          continue;
+        }
+
+        // Check if alarm already exists for this dose
+        const existingAlarm = existingMedicineNotifications.find(notification => {
+          const data = notification.content.data;
+          return data?.medicineId === dose.medicineId && data?.time === dose.time;
+        });
+
+        if (existingAlarm) {
+          console.log(`⏭️ Skipping ${dose.medicineName} - alarm already exists`);
+          continue;
+        }
+
+        // Parse the time and create proper schedule date
+        const [hour, minute] = dose.time.split(':').map(Number);
+        
+        // Create schedule date for today
+        const scheduleDate = new Date();
+        scheduleDate.setHours(hour, minute, 0, 0);
+        
+        // If the time has already passed today, schedule for tomorrow
+        if (scheduleDate <= now) {
+          scheduleDate.setDate(scheduleDate.getDate() + 1);
+          console.log(`⏰ ${dose.medicineName} time passed, scheduling for tomorrow at ${scheduleDate.toLocaleString()}`);
+        } else {
+          console.log(`⏰ ${dose.medicineName} scheduling for today at ${scheduleDate.toLocaleString()}`);
+        }
+
+        // Calculate milliseconds until alarm
+        const millisecondsUntilAlarm = scheduleDate.getTime() - now.getTime();
+        const secondsUntilAlarm = Math.floor(millisecondsUntilAlarm / 1000);
+
+        // Don't schedule if it's more than 24 hours away (shouldn't happen with our logic)
+        if (secondsUntilAlarm > 86400) {
+          console.log(`⚠️ Skipping ${dose.medicineName} - too far in future (${secondsUntilAlarm}s)`);
+          continue;
+        }
+
+        // Allow scheduling even if it's very close (remove the 30-second restriction)
+        if (secondsUntilAlarm <= 0) {
+          console.log(`⚠️ Skipping ${dose.medicineName} - time has already passed (${secondsUntilAlarm}s)`);
+          continue;
+        }
+
+        // Schedule the notification
+        const notificationId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '💊 MEDICINE TIME!',
+            body: `Time to take ${dose.medicineName} - ${dose.dosage}`,
+            data: {
+              type: 'medicine',
+              medicineId: dose.medicineId,
+              time: dose.time,
+              medicineName: dose.medicineName,
+              dosage: dose.dosage,
+            },
+            sound: 'default',
+            priority: 'high',
+          },
+          trigger: {
+            seconds: Math.max(1, secondsUntilAlarm),
+          } as any,
+        });
+
+        scheduledCount++;
+        const scheduleTime = scheduleDate.toLocaleTimeString();
+        console.log(`✅ Auto-scheduled: ${dose.medicineName} at ${scheduleTime} (ID: ${notificationId})`);
+        console.log(`⏰ Will trigger in ${secondsUntilAlarm} seconds (${Math.floor(secondsUntilAlarm/60)} minutes)`);
+      }
+
+      console.log(`🎯 Auto-scheduling complete: ${scheduledCount} new alarms, ${cancelledCount} cancelled`);
+      
+      // Save alarm state
+      await AsyncStorage.setItem('lastAutoSchedule', now.toISOString());
+      
+      // Add a small delay before re-enabling the notification listener
+      setTimeout(() => {
+        setIsSchedulingAlarms(false);
+        console.log('✅ Alarm scheduling complete, notification listener re-enabled');
+      }, 2000); // 2 second delay
+      
+    } catch (error) {
+      console.error('❌ Error auto-scheduling alarms:', error);
+      setIsSchedulingAlarms(false);
+    }
+  }, [medicineAlarmsEnabled, todaySchedule]);
+
+  // Request notification permissions
+  useEffect(() => {
+    const requestPermissions = async () => {
+      try {
+        // Check current permission status first
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        
+        if (existingStatus !== 'granted') {
+          console.log('🔔 Requesting notification permissions...');
+          const { status } = await Notifications.requestPermissionsAsync({
+            ios: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+            },
+            android: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+            },
+          });
+          
+          if (status !== 'granted') {
+            console.log('❌ Notification permissions denied');
+            Alert.alert(
+              'Notification Permissions Required',
+              'Please enable notifications in your device settings to receive medicine reminders. Go to Settings > Apps > HealthSync > Notifications.',
+              [
+                { text: 'OK' },
+                { 
+                  text: 'Open Settings', 
+                  onPress: () => {
+                    // This would ideally open device settings, but we'll just show an alert
+                    Alert.alert('Settings', 'Please manually enable notifications for this app in your device settings.');
+                  }
+                }
+              ]
+            );
+          } else {
+            console.log('✅ Notification permissions granted');
+          }
+        } else {
+          console.log('✅ Notification permissions already granted');
+        }
+      } catch (error) {
+        console.error('Error requesting notification permissions:', error);
+      }
+    };
+
+    requestPermissions();
+  }, []);
+
+  // Auto-schedule alarms when data changes - but only once per day
+  useEffect(() => {
+    const checkAndScheduleAlarms = async () => {
+      if (todaySchedule.length === 0) return;
+      
+      try {
+        // Check if we've already scheduled alarms today
+        const lastSchedule = await AsyncStorage.getItem('lastAutoSchedule');
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Allow re-scheduling if:
+        // 1. We haven't scheduled today, OR
+        // 2. The app was just started (check if we have any existing notifications)
+        const existingNotifications = await Notifications.getAllScheduledNotificationsAsync();
+        const existingMedicineNotifications = existingNotifications.filter(notification => 
+          notification.content.data?.type === 'medicine'
+        );
+        
+        const shouldReschedule = !lastSchedule || 
+          !lastSchedule.startsWith(today) || 
+          existingMedicineNotifications.length === 0;
+        
+        if (!shouldReschedule) {
+          console.log('⏭️ Alarms already scheduled today, skipping auto-schedule');
+          return;
+        }
+        
+        // Schedule alarms
+        console.log('🔄 Scheduling alarms (first time today or app restart)');
+        setTimeout(() => {
+          autoScheduleAlarms();
+        }, 1000);
+      } catch (error) {
+        console.error('Error checking last schedule:', error);
+      }
+    };
+
+    checkAndScheduleAlarms();
+  }, [autoScheduleAlarms, todaySchedule]);
+
+  // Handle app state changes for re-scheduling - but only if needed
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: any) => {
+      if (appState.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('📱 App became active');
+        // Only re-schedule if alarms are enabled and we have medicines
+        // But don't auto-schedule every time to prevent spam
+        if (medicineAlarmsEnabled && todaySchedule.length > 0) {
+          // Just log that we're active, don't auto-schedule
+          console.log('📱 App active with medicines - alarms should be working');
+        }
+      }
+      setAppState(nextAppState);
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [appState, medicineAlarmsEnabled, todaySchedule]);
+
+  // Medicine Alarm Handler
+  useEffect(() => {
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('🔔 Medicine alarm received:', notification);
+      
+      // Only handle medicine notifications
+      if (notification.request.content.data?.type !== 'medicine') {
+        return;
+      }
+      
+      // Don't show alerts if we're currently scheduling alarms
+      if (isSchedulingAlarms) {
+        console.log('⚠️ Ignoring notification during alarm scheduling');
+        return;
+      }
+      
+      // Trigger local alarm effects
+      if (medicineAlarmVibration) {
+        // Vibrate pattern: wait 0ms, vibrate 500ms, wait 200ms, vibrate 500ms
+        Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+      }
+      
+      // Show medicine alarm alert
+      Alert.alert(
+        '💊 MEDICINE ALARM!',
+        `Time to take your ${notification.request.content.data?.medicineName}! Stay healthy! 💊`,
+        [
+          {
+            text: 'Dismiss',
+            style: 'cancel',
+            onPress: () => Vibration.cancel(),
+          },
+          {
+            text: 'Mark as Taken',
+            onPress: () => {
+              Vibration.cancel();
+              // Find the medicine from notification data and mark as taken
+              const medicineData = notification.request.content.data;
+              if (medicineData && medicineData.medicineId && medicineData.time) {
+                const dose = todaySchedule.find(d => 
+                  d.medicineId === medicineData.medicineId && d.time === medicineData.time
+                );
+                if (dose) {
+                  markMedicineTaken(dose, true);
+                }
+              }
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    });
+
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('📱 Medicine alarm response:', response);
+      Vibration.cancel();
+      
+      // Handle notification tap
+      const data = response.notification.request.content.data;
+      if (data?.type === 'medicine' && data?.medicineId && data?.time) {
+        const dose = todaySchedule.find(d => 
+          d.medicineId === data.medicineId && d.time === data.time
+        );
+        if (dose && response.actionIdentifier === 'MARK_TAKEN') {
+          markMedicineTaken(dose, true);
+        }
+      }
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+      Vibration.cancel();
+    };
+  }, [medicineAlarmVibration, todaySchedule, isSchedulingAlarms]);
+
+  // Medicine alarm status logging
+  useEffect(() => {
+    if (!medicineAlarmsEnabled || todaySchedule.length === 0) return;
+
+    console.log('🎯 Medicine alarms enabled for:', todaySchedule.length, 'medicines');
+    console.log('📋 Today\'s schedule:', todaySchedule.map(d => `${d.medicineName} at ${d.time}`));
+  }, [todaySchedule, medicineAlarmsEnabled]);
+
   // Load medicines on component mount
   useEffect(() => {
     const checkAuthAndLoadData = async () => {
@@ -130,6 +473,53 @@ const MedicineTracker: React.FC = () => {
     checkAuthAndLoadData();
   }, []);
 
+  // Load alarm settings from storage and check if we need to reset daily schedule
+  useEffect(() => {
+    const loadAlarmSettings = async () => {
+      try {
+        const alarmsEnabled = await AsyncStorage.getItem('medicineAlarmsEnabled');
+        const vibrationEnabled = await AsyncStorage.getItem('medicineAlarmVibration');
+        const lastSchedule = await AsyncStorage.getItem('lastAutoSchedule');
+        
+        if (alarmsEnabled !== null) {
+          setMedicineAlarmsEnabled(JSON.parse(alarmsEnabled));
+        }
+        if (vibrationEnabled !== null) {
+          setMedicineAlarmVibration(JSON.parse(vibrationEnabled));
+        }
+        
+        // Check if we need to reset the daily schedule (new day)
+        if (lastSchedule) {
+          const lastScheduleDate = lastSchedule.split('T')[0];
+          const today = new Date().toISOString().split('T')[0];
+          
+          if (lastScheduleDate !== today) {
+            console.log('📅 New day detected - clearing last schedule');
+            await AsyncStorage.removeItem('lastAutoSchedule');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading alarm settings:', error);
+      }
+    };
+
+    loadAlarmSettings();
+  }, []);
+
+  // Save alarm settings when they change
+  useEffect(() => {
+    const saveAlarmSettings = async () => {
+      try {
+        await AsyncStorage.setItem('medicineAlarmsEnabled', JSON.stringify(medicineAlarmsEnabled));
+        await AsyncStorage.setItem('medicineAlarmVibration', JSON.stringify(medicineAlarmVibration));
+      } catch (error) {
+        console.error('Error saving alarm settings:', error);
+      }
+    };
+
+    saveAlarmSettings();
+  }, [medicineAlarmsEnabled, medicineAlarmVibration]);
+
   // Load all medicines
   const loadMedicines = async () => {
     try {
@@ -148,8 +538,11 @@ const MedicineTracker: React.FC = () => {
   const loadTodaySchedule = async () => {
     try {
       setLoadingToday(true);
+      console.log('🔄 Loading today\'s schedule...');
       const todayData = await getTodayMedicinesAPI();
+      console.log('📅 Today\'s schedule data:', todayData);
       setTodaySchedule(todayData);
+      console.log('✅ Today\'s schedule updated with', todayData.length, 'items');
     } catch (error) {
       console.error('Error loading today\'s schedule:', error);
       Alert.alert('Error', 'Failed to load today\'s schedule. Please try again.');
@@ -219,6 +612,11 @@ const MedicineTracker: React.FC = () => {
       return;
     }
 
+    // Check if start date is today
+    const today = new Date().toISOString().split('T')[0];
+    const isStartingToday = formData.startDate === today;
+    console.log('📅 Medicine start date:', formData.startDate, 'Today:', today, 'Is starting today:', isStartingToday);
+
     try {
       // Check authentication before adding medicine
       const token = await AsyncStorage.getItem('token');
@@ -252,7 +650,8 @@ const MedicineTracker: React.FC = () => {
         notes: formData.notes,
       };
 
-      await addMedicineAPI(medicineData);
+      const result = await addMedicineAPI(medicineData);
+      console.log('✅ Medicine added successfully:', result);
 
       // Reset form
       setFormData({
@@ -267,11 +666,21 @@ const MedicineTracker: React.FC = () => {
       });
       setShowAddModal(false);
 
-      // Reload data
+      // Reload data with a small delay to ensure backend has processed the data
+      console.log('🔄 Reloading medicines and today\'s schedule...');
       await loadMedicines();
-      await loadTodaySchedule();
+      
+      // Add a small delay before loading today's schedule
+      setTimeout(async () => {
+        await loadTodaySchedule();
+        console.log('✅ Today\'s schedule reloaded after adding medicine');
+      }, 500);
 
-      Alert.alert('Success', 'Medicine added successfully!');
+      const message = isStartingToday 
+        ? 'Medicine added successfully! It will appear in today\'s schedule. Alarms will be automatically scheduled.'
+        : 'Medicine added successfully! It will appear in the schedule starting from the selected date. Alarms will be automatically scheduled.';
+      
+      Alert.alert('Success', message);
     } catch (error) {
       console.error('Error adding medicine:', error);
       Alert.alert('Error', 'Failed to add medicine. Please try again.');
@@ -353,7 +762,28 @@ const MedicineTracker: React.FC = () => {
         taken,
       });
 
-      // Show success feedback (optional - you can remove this if you prefer)
+      // Add to completed doses set to hide the buttons
+      setCompletedDoses(prev => new Set([...prev, medicineKey]));
+
+      // If medicine was marked as taken, cancel its specific alarm immediately
+      if (taken) {
+        try {
+          const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+          const medicineNotifications = allNotifications.filter(notification => 
+            notification.content.data?.type === 'medicine' &&
+            notification.content.data?.medicineId === dose.medicineId &&
+            notification.content.data?.time === dose.time
+          );
+          
+          for (const notification of medicineNotifications) {
+            await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+            console.log(`🔕 Cancelled alarm for ${dose.medicineName} at ${dose.time}`);
+          }
+        } catch (error) {
+          console.error('Error cancelling specific alarm:', error);
+        }
+      }
+
       console.log(`Medicine ${taken ? 'marked as taken' : 'marked as not taken'} successfully`);
 
     } catch (error) {
@@ -385,10 +815,60 @@ const MedicineTracker: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              // First, cancel ALL medicine alarms for this specific medicine
+              console.log(`🗑️ Starting deletion process for medicine ID: ${medicineId}`);
+              const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+              console.log(`📋 Found ${allNotifications.length} total scheduled notifications`);
+              
+              // Cancel notifications for this specific medicine
+              const medicineNotifications = allNotifications.filter(notification => 
+                notification.content.data?.type === 'medicine' &&
+                notification.content.data?.medicineId === medicineId
+              );
+              
+              console.log(`💊 Cancelling ${medicineNotifications.length} notifications for medicine ID: ${medicineId}`);
+              
+              for (const notification of medicineNotifications) {
+                const data = notification.content.data;
+                console.log(`🔕 Cancelling alarm for: ${data?.medicineName} at ${data?.time} (ID: ${notification.identifier})`);
+                await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+              }
+              
+              console.log(`✅ Successfully cancelled ${medicineNotifications.length} alarms for medicine ID: ${medicineId}`);
+
+              // Delete the medicine from the database
               await deleteMedicineAPI(medicineId);
+              
+              // Update local state immediately
               setMedicines(medicines.filter(m => m.id !== medicineId));
               setMedicineLogs(logs => logs.filter(l => l.medicineId !== medicineId));
+              
+              // Also remove from today's schedule immediately to prevent any issues
+              setTodaySchedule(prev => prev.filter(dose => dose.medicineId !== medicineId));
+              
+              // Verify that alarms for the deleted medicine are gone
+              const remainingNotifications = await Notifications.getAllScheduledNotificationsAsync();
+              const remainingMedicineNotifications = remainingNotifications.filter(notification => 
+                notification.content.data?.type === 'medicine' &&
+                notification.content.data?.medicineId === medicineId
+              );
+              
+              if (remainingMedicineNotifications.length === 0) {
+                console.log(`✅ Verification: No alarms remain for deleted medicine ID: ${medicineId}`);
+              } else {
+                console.log(`⚠️ Warning: ${remainingMedicineNotifications.length} alarms still exist for deleted medicine ID: ${medicineId}`);
+                // Force cancel any remaining alarms
+                for (const notification of remainingMedicineNotifications) {
+                  await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+                  console.log(`🔕 Force cancelled remaining alarm: ${notification.identifier}`);
+                }
+              }
+              
+              // Reload today's schedule to get fresh data, but do not trigger auto-scheduling
+              console.log('🔄 Reloading today\'s schedule after deletion...');
               await loadTodaySchedule();
+              
+              console.log(`✅ Medicine deleted successfully and alarms cancelled`);
             } catch (error) {
               console.error('Error deleting medicine:', error);
               Alert.alert('Error', 'Failed to delete medicine. Please try again.');
@@ -429,9 +909,22 @@ const MedicineTracker: React.FC = () => {
 
     return (
       <View className="px-5 mt-4">
-        <Text className="text-xl font-light mb-4 text-white">
-          Today's Schedule
-        </Text>
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-xl font-light text-white">
+            Today's Schedule
+          </Text>
+          <TouchableOpacity
+            className="bg-white/20 backdrop-blur-sm rounded-full p-2"
+            onPress={loadTodaySchedule}
+            disabled={loadingToday}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={20} 
+              color="white" 
+            />
+          </TouchableOpacity>
+        </View>
         {todaySchedule.map((dose, index) => (
           <View
             key={`${dose.medicineId}-${dose.time}-${index}`}
@@ -445,53 +938,63 @@ const MedicineTracker: React.FC = () => {
           >
             <View className="flex-row justify-between items-center">
               <View className="flex-1">
-                <Text className="font-semibold text-lg text-white">
+                <Text className="font-semibold text-lg text-black">
                   {dose.medicineName}
                 </Text>
                 <Text className="text-white/80">
                   {dose.dosage} at {formatTimeForDisplay(dose.time)}
                 </Text>
               </View>
-              <View className="flex-row">
-                <TouchableOpacity
-                  className={`w-12 h-12 rounded-full mr-2 items-center justify-center ${
-                    dose.taken === true
-                      ? 'bg-green-500'
-                      : 'bg-white/20 backdrop-blur-sm'
-                  }`}
-                  onPress={() => markMedicineTaken(dose, true)}
-                  disabled={updatingMedicine === `${dose.medicineId}-${dose.time}`}
-                >
-                  {updatingMedicine === `${dose.medicineId}-${dose.time}` ? (
-                    <ActivityIndicator size="small" color={dose.taken === true ? 'white' : '#ffffff'} />
-                  ) : (
-                    <Ionicons 
-                      name="checkmark" 
-                      size={24} 
-                      color={dose.taken === true ? 'white' : '#ffffff'} 
-                    />
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className={`w-12 h-12 rounded-full items-center justify-center ${
-                    dose.taken === false
-                      ? 'bg-red-500'
-                      : 'bg-white/20 backdrop-blur-sm'
-                  }`}
-                  onPress={() => markMedicineTaken(dose, false)}
-                  disabled={updatingMedicine === `${dose.medicineId}-${dose.time}`}
-                >
-                  {updatingMedicine === `${dose.medicineId}-${dose.time}` ? (
-                    <ActivityIndicator size="small" color={dose.taken === false ? 'white' : '#ffffff'} />
-                  ) : (
-                    <Ionicons 
-                      name="close" 
-                      size={24} 
-                      color={dose.taken === false ? 'white' : '#ffffff'} 
-                    />
-                  )}
-                </TouchableOpacity>
-              </View>
+              {!completedDoses.has(`${dose.medicineId}-${dose.time}`) && (
+                <View className="flex-row">
+                  <TouchableOpacity
+                    className={`w-12 h-12 rounded-full mr-2 items-center justify-center ${
+                      dose.taken === true
+                        ? 'bg-green-500'
+                        : 'bg-white/20 backdrop-blur-sm'
+                    }`}
+                    onPress={() => markMedicineTaken(dose, true)}
+                    disabled={updatingMedicine === `${dose.medicineId}-${dose.time}`}
+                  >
+                    {updatingMedicine === `${dose.medicineId}-${dose.time}` ? (
+                      <ActivityIndicator size="small" color={dose.taken === true ? 'white' : '#ffffff'} />
+                    ) : (
+                      <Ionicons 
+                        name="checkmark" 
+                        size={24} 
+                        color={dose.taken === true ? 'white' : '#ffffff'} 
+                      />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    className={`w-12 h-12 rounded-full items-center justify-center ${
+                      dose.taken === false
+                        ? 'bg-red-500'
+                        : 'bg-white/20 backdrop-blur-sm'
+                    }`}
+                    onPress={() => markMedicineTaken(dose, false)}
+                    disabled={updatingMedicine === `${dose.medicineId}-${dose.time}`}
+                  >
+                    {updatingMedicine === `${dose.medicineId}-${dose.time}` ? (
+                      <ActivityIndicator size="small" color={dose.taken === false ? 'white' : '#ffffff'} />
+                    ) : (
+                      <Ionicons 
+                        name="close" 
+                        size={24} 
+                        color={dose.taken === false ? 'white' : '#ffffff'} 
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {completedDoses.has(`${dose.medicineId}-${dose.time}`) && (
+                <View className="items-center">
+                  <Text className="text-white/80 text-sm font-medium">
+                    {dose.taken ? '✓ Taken' : '✗ Skipped'}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         ))}
@@ -533,7 +1036,7 @@ const MedicineTracker: React.FC = () => {
           >
             <View className="flex-row justify-between items-start">
               <View className="flex-1">
-                <Text className="font-semibold text-lg text-white">
+                <Text className="font-semibold text-lg text-black">
                   {medicine.name}
                 </Text>
                 <Text className="text-white/80 mt-1">
@@ -656,15 +1159,24 @@ const MedicineTracker: React.FC = () => {
 
   const renderMainContent = () => (
     <View className="flex-1" style={{ paddingHorizontal: 0 }}>
-      <View className="flex-row justify-between items-center px-4 py-4 bg-transparent mt-4">
-        <Text className="text-2xl font-bold text-white">
+      <View className="items-center px-4 py-4 bg-transparent mt-8">
+        <Text className="text-2xl font-bold text-black">
           Medicine Tracker
         </Text>
+      </View>
+      
+      <View className="px-4 pb-4">
+        <Text className="text-white/80 text-center italic text-base">
+          Consistency is the key to recovery
+        </Text>
+      </View>
+      
+      <View className="items-center px-4 pb-4">
         <TouchableOpacity
-          className="bg-white/20 backdrop-blur-sm rounded-full w-12 h-12 items-center justify-center"
+          className="bg-white/20 backdrop-blur-sm rounded-full w-16 h-16 items-center justify-center"
           onPress={() => setShowAddModal(true)}
         >
-          <Ionicons name="add" size={24} color="white" />
+          <Ionicons name="add" size={32} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -676,8 +1188,51 @@ const MedicineTracker: React.FC = () => {
         {renderTodaySchedule()}
         {renderMedicinesList()}
         
-        {/* Add Medicine Section in the middle */}
-        <View className="px-5 mt-8 mb-8">
+        {/* Medicine Alarms Settings */}
+        <View className="px-5 mt-6">
+          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+            <Text className="text-xl text-white font-semibold text-center mb-3">
+              🔔 Auto Medicine Alarms
+            </Text>
+            
+            <View className="flex-row items-center justify-center mb-3">
+              <Text className="text-sm text-white/80 mr-2">
+                {medicineAlarmsEnabled ? 'Auto Alarms On' : 'Auto Alarms Off'}
+              </Text>
+              <Switch
+                value={medicineAlarmsEnabled}
+                onValueChange={setMedicineAlarmsEnabled}
+                trackColor={{ false: '#E5E7EB', true: '#11B5CF' }}
+                thumbColor={medicineAlarmsEnabled ? '#ffffff' : '#9CA3AF'}
+              />
+            </View>
+            
+            {medicineAlarmsEnabled && (
+              <View className="flex-row items-center justify-between mb-3 px-4">
+                <Text className="text-sm text-white/80">Vibration</Text>
+                <Switch
+                  value={medicineAlarmVibration}
+                  onValueChange={setMedicineAlarmVibration}
+                  trackColor={{ false: '#E5E7EB', true: '#11B5CF' }}
+                  thumbColor={medicineAlarmVibration ? '#ffffff' : '#9CA3AF'}
+                />
+              </View>
+            )}
+            
+            {medicineAlarmsEnabled ? (
+              <Text className="text-sm text-white/60 text-center italic">
+                Alarms will trigger automatically at medicine times
+              </Text>
+            ) : (
+              <Text className="text-base text-white/60 text-center italic">
+                Medicine alarms are currently disabled
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Add Medicine Section */}
+        <View className="px-5 mt-6 mb-8">
           <TouchableOpacity
             className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 items-center flex-row justify-center border border-white/30"
             onPress={() => setShowAddModal(true)}
@@ -689,18 +1244,186 @@ const MedicineTracker: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Capsule.json Lottie Animation */}
-        <View className="px-5 mt-8 mb-8">
-          <View className="bg-transparent rounded-2xl p-6 items-center">
-            <LottieView
-              source={require('../assets/lottie/capsule.json')}
-              autoPlay
-              loop={false}
-              duration={5000}
-              style={{ width: 350, height: 350 }}
-            />
-          </View>
+        {/* Test Medicine Alarm Button */}
+        <View className="px-5 mt-4 mb-8">
+          <TouchableOpacity
+            className="bg-blue-500/20 backdrop-blur-sm rounded-2xl p-4 items-center flex-row justify-center border border-blue-300/30"
+            onPress={async () => {
+              try {
+                // Schedule a test notification for 10 seconds from now
+                const testNotificationId = await Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: '💊 TEST MEDICINE ALARM!',
+                    body: 'This is a test alarm to verify notifications are working!',
+                    data: {
+                      type: 'test',
+                    },
+                    sound: 'default',
+                    priority: 'high',
+                  },
+                  trigger: {
+                    seconds: 10,
+                  } as any,
+                });
+                
+                console.log('🧪 Test notification scheduled with ID:', testNotificationId);
+                Alert.alert(
+                  'Test Alarm Scheduled',
+                  'A test alarm will ring in 10 seconds to verify the notification system is working!',
+                  [{ text: 'OK' }]
+                );
+              } catch (error) {
+                console.error('Error scheduling test notification:', error);
+                Alert.alert('Error', 'Failed to schedule test notification. Please check notification permissions.');
+              }
+            }}
+          >
+            <Ionicons name="alarm" size={24} color="white" />
+            <Text className="text-white font-semibold text-lg ml-3">
+              Test Notification System
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Manual Schedule Alarms Button (Backup) */}
+        <View className="px-5 mt-4 mb-8">
+          <TouchableOpacity
+            className="bg-orange-500/20 backdrop-blur-sm rounded-2xl p-4 items-center flex-row justify-center border border-orange-300/30"
+            onPress={async () => {
+              try {
+                // Clear the last schedule flag to force re-scheduling
+                await AsyncStorage.removeItem('lastAutoSchedule');
+                await autoScheduleAlarms();
+                Alert.alert(
+                  'Alarms Refreshed', 
+                  'Medicine alarms have been manually refreshed and will ring at their scheduled times!'
+                );
+              } catch (error) {
+                console.error('Error manually scheduling alarms:', error);
+                Alert.alert('Error', 'Failed to schedule alarms. Please try again.');
+              }
+            }}
+          >
+            <Ionicons name="refresh" size={24} color="white" />
+            <Text className="text-white font-semibold text-lg ml-3">
+              Refresh Alarms
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Check Scheduled Notifications Button */}
+        <View className="px-5 mt-4 mb-8">
+          <TouchableOpacity
+            className="bg-purple-500/20 backdrop-blur-sm rounded-2xl p-4 items-center flex-row justify-center border border-purple-300/30"
+            onPress={async () => {
+              try {
+                const debugInfo = await debugAlarmStatus();
+                if (debugInfo) {
+                  const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+                  const medicineNotifications = allNotifications.filter(notification => 
+                    notification.content.data?.type === 'medicine'
+                  );
+                  
+                  let message = `🔍 Debug Info:\n\n`;
+                  message += `📱 Permissions: ${debugInfo.permissions}\n`;
+                  message += `🔔 Alarms Enabled: ${debugInfo.alarmsEnabled}\n`;
+                  message += `📅 Today's Schedule: ${debugInfo.todayScheduleCount} items\n`;
+                  message += `💊 Medicine Alarms: ${debugInfo.medicineNotifications}\n`;
+                  message += `📋 Total Notifications: ${debugInfo.totalNotifications}\n\n`;
+                  
+                  if (medicineNotifications.length > 0) {
+                    message += `Scheduled Alarms:\n`;
+                    medicineNotifications.forEach((notification, index) => {
+                      const data = notification.content.data;
+                      message += `${index + 1}. ${data?.medicineName} at ${data?.time}\n`;
+                    });
+                  } else {
+                    message += `No medicine alarms scheduled.`;
+                  }
+                  
+                  Alert.alert('Alarm Debug Info', message, [{ text: 'OK' }]);
+                }
+              } catch (error) {
+                console.error('Error checking notifications:', error);
+                Alert.alert('Error', 'Failed to check scheduled notifications.');
+              }
+            }}
+          >
+            <Ionicons name="list" size={24} color="white" />
+            <Text className="text-white font-semibold text-lg ml-3">
+              Debug Alarm Status
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Clear All Alarms Button */}
+        <View className="px-5 mt-4 mb-8">
+          <TouchableOpacity
+            className="bg-red-500/20 backdrop-blur-sm rounded-2xl p-4 items-center flex-row justify-center border border-red-300/30"
+            onPress={async () => {
+              try {
+                Alert.alert(
+                  'Clear All Medicine Alarms',
+                  'This will cancel ALL scheduled medicine alarms. Are you sure?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Clear All',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+                          const medicineNotifications = allNotifications.filter(notification => 
+                            notification.content.data?.type === 'medicine'
+                          );
+                          
+                          for (const notification of medicineNotifications) {
+                            await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+                          }
+                          
+                          console.log(`🗑️ Cleared ${medicineNotifications.length} medicine alarms`);
+                          await AsyncStorage.removeItem('lastAutoSchedule');
+                          
+                          Alert.alert(
+                            'Alarms Cleared',
+                            `Successfully cancelled ${medicineNotifications.length} medicine alarms.`,
+                            [{ text: 'OK' }]
+                          );
+                        } catch (error) {
+                          console.error('Error clearing alarms:', error);
+                          Alert.alert('Error', 'Failed to clear alarms.');
+                        }
+                      }
+                    }
+                  ]
+                );
+              } catch (error) {
+                console.error('Error preparing to clear alarms:', error);
+                Alert.alert('Error', 'Failed to prepare alarm clearing.');
+              }
+            }}
+          >
+            <Ionicons name="trash" size={24} color="white" />
+            <Text className="text-white font-semibold text-lg ml-3">
+              Clear All Alarms
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Alarm Status Display */}
+        {medicineAlarmsEnabled && (
+          <View className="px-5 mt-4 mb-8">
+            <View className="bg-green-500/10 backdrop-blur-sm rounded-2xl p-4 border border-green-300/20">
+              <Text className="text-white font-semibold text-center mb-2">
+                ✅ Automatic Alarms Active
+              </Text>
+              <Text className="text-white/80 text-center text-sm">
+                {todaySchedule.filter(dose => !dose.taken).length} pending alarms for today
+              </Text>
+            </View>
+          </View>
+        )}
+
       </ScrollView>
     </View>
   );
@@ -769,7 +1492,7 @@ const MedicineTracker: React.FC = () => {
                           <TouchableOpacity
                             key={option}
                             className={`p-3 border-b border-gray-100 ${
-                              formData.dosageType === option ? 'bg-blue-50' : ''
+                              formData.dosageType === option ? 'bgWarnings-blue-50' : ''
                             }`}
                             onPress={() => {
                               setFormData({...formData, dosageType: option});
@@ -896,24 +1619,63 @@ const MedicineTracker: React.FC = () => {
     </Modal>
   );
 
+  // Debug function to check alarm status
+  const debugAlarmStatus = async () => {
+    try {
+      console.log('🔍 Debugging alarm status...');
+      
+      // Check permissions
+      const { status } = await Notifications.getPermissionsAsync();
+      console.log('📱 Notification permissions:', status);
+      
+      // Check scheduled notifications
+      const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+      const medicineNotifications = allNotifications.filter(notification => 
+        notification.content.data?.type === 'medicine'
+      );
+      
+      console.log('📋 Total scheduled notifications:', allNotifications.length);
+      console.log('💊 Medicine notifications:', medicineNotifications.length);
+      
+      // Log details of each medicine notification
+      medicineNotifications.forEach((notification, index) => {
+        const data = notification.content.data;
+        console.log(`💊 Medicine ${index + 1}:`, {
+          id: notification.identifier,
+          medicineName: data?.medicineName,
+          time: data?.time,
+          trigger: notification.trigger,
+        });
+      });
+      
+      // Check today's schedule
+      console.log('📅 Today\'s schedule:', todaySchedule.map(d => ({
+        name: d.medicineName,
+        time: d.time,
+        taken: d.taken,
+      })));
+      
+      // Check alarm settings
+      console.log('🔔 Alarm settings:', {
+        enabled: medicineAlarmsEnabled,
+        vibration: medicineAlarmVibration,
+      });
+      
+      return {
+        permissions: status,
+        totalNotifications: allNotifications.length,
+        medicineNotifications: medicineNotifications.length,
+        todayScheduleCount: todaySchedule.length,
+        alarmsEnabled: medicineAlarmsEnabled,
+      };
+    } catch (error) {
+      console.error('Error debugging alarm status:', error);
+      return null;
+    }
+  };
+
   return (
-    <LinearGradient
-      colors={[
-        '#11B5CF',
-        '#0EA5BF',
-        '#0B95AF',
-        '#08859F',
-        '#05758F',
-        '#02657F',
-        '#01556F',
-        '#00455F',
-        '#00354F',
-        '#00253F',
-      ]}
-      className="flex-1"
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-    >
+    <View className="flex-1" style={{ backgroundColor: '#73C8A9' }}>
       <SafeAreaView className="flex-1" style={{ paddingHorizontal: 0 }}>
         {/* Main Content - this will be blurred when modal is open */}
         {showAddModal && (
@@ -930,7 +1692,7 @@ const MedicineTracker: React.FC = () => {
         {/* Modal */}
         {renderAddMedicineModal()}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 };
 
