@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 30,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1f2937',
   },

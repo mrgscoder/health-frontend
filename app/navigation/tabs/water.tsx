@@ -424,7 +424,6 @@ const Water = () => {
     let intervalId: number | null = null;
     
     if (remindersEnabled) {
-      // Call immediately when enabled
       const callRemindersAPI = async () => {
         try {
           const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
@@ -447,11 +446,9 @@ const Water = () => {
         }
       };
 
-      // Call immediately
-      callRemindersAPI();
-      
-      // Set up interval for every 8 minutes (480000 ms)
-      intervalId = setInterval(callRemindersAPI, 480000);
+      // Don't call immediately - only set up the interval
+      // This prevents the alarm from triggering when the page loads
+      intervalId = setInterval(callRemindersAPI, 7200000); // Every 2 hours (2 * 60 * 60 * 1000 ms)
     }
 
     return () => {

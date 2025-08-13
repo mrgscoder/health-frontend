@@ -353,17 +353,9 @@ const ProfilePage: React.FC = () => {
 
         {/* Basic Information */}
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>
-              Basic Information
-            </Text>
-            <TouchableOpacity 
-              onPress={handleEditProfile}
-              style={styles.editButton}
-            >
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.cardTitle}>
+            Basic Information
+          </Text>
 
           <View style={styles.infoContainer}>
             <View style={styles.infoRow}>
@@ -389,6 +381,22 @@ const ProfilePage: React.FC = () => {
               </View>
             </View>
           </View>
+        </View>
+
+        {/* Fitness Analytics Button */}
+        <View style={styles.card}>
+          <TouchableOpacity 
+            style={styles.analyticsButton}
+            onPress={() => router.push('/record/Analytics')}
+          >
+            <View style={styles.analyticsButtonContent}>
+              <Icon name="analytics" size={24} color="#000000" style={styles.analyticsIcon} />
+              <Text style={styles.analyticsButtonText}>
+                View Fitness Analytics
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={24} color="#000000" />
+          </TouchableOpacity>
         </View>
 
         {/* Lifestyle Preferences */}
@@ -459,87 +467,10 @@ const ProfilePage: React.FC = () => {
           </View>
         </View>
 
-        {/* Medical Information */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Medical Information
-          </Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Icon name="medication" size={22} color="#19b7d0" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Medications</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color="#19b7d0" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Icon name="warning" size={22} color="#19b7d0" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Allergies</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color="#19b7d0" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]}>
-            <View style={styles.menuItemLeft}>
-              <Icon name="local-hospital" size={22} color="#19b7d0" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Medical Conditions</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color="#19b7d0" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Settings */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>
-            Settings
-          </Text>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Icon name="notifications" size={22} color="#19b7d0" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Notifications</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color="#19b7d0" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Icon name="lock" size={22} color="#19b7d0" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Privacy & Security</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color="#19b7d0" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Icon name="assessment" size={22} color="#19b7d0" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Data Export</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color="#19b7d0" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]}>
-            <View style={styles.menuItemLeft}>
-              <Icon name="help" size={22} color="#19b7d0" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Help & Support</Text>
-            </View>
-            <Icon name="chevron-right" size={24} color="#19b7d0" />
-          </TouchableOpacity>
-        </View>
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={styles.primaryButton}
-            onPress={() => Alert.alert('Update', 'Updating health recommendations...')}
-          >
-            <Text style={styles.primaryButtonText}>
-              Update Health Recommendations
-            </Text>
-          </TouchableOpacity>
-          
           <TouchableOpacity 
             style={styles.secondaryButton}
             onPress={handleLogout}
@@ -773,6 +704,27 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#374151',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  analyticsButton: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  analyticsButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  analyticsIcon: {
+    marginRight: 12,
+  },
+  analyticsButtonText: {
+    color: '#000000',
     fontSize: 18,
     fontWeight: '600',
   },

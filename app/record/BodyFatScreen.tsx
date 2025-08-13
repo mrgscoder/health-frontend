@@ -61,14 +61,24 @@ export default function BodyFatScreen() {
   const fetchUserProfile = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        console.log('No token found for user profile fetch');
+        return;
+      }
 
+      console.log('Fetching user profile with token:', token.substring(0, 20) + '...');
+      
       const response = await axios.get(`${BASE_URL}/api/user-form/user-form`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.data.success && response.data.data) {
+      console.log('User profile response:', response.data);
+
+      if (response.data.data) {
+        console.log('Setting user gender to:', response.data.data.gender);
         setUserGender(response.data.data.gender);
+      } else {
+        console.log('No user data found in response');
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -124,10 +134,14 @@ export default function BodyFatScreen() {
         result = { category: 'Fitness', color: '#dcfce7', textColor: '#16a34a' };
       } else if (bodyFat < 25) {
         result = { category: 'Average', color: '#fef3c7', textColor: '#a16207' };
-      } else if (bodyFat < 32) {
+      } else if (bodyFat < 30) {
         result = { category: 'Above Average', color: '#fed7aa', textColor: '#c2410c' };
+      } else if (bodyFat < 35) {
+        result = { category: 'Obese Class I (Mild)', color: '#fecaca', textColor: '#b91c1c' };
+      } else if (bodyFat < 40) {
+        result = { category: 'Obese Class II (Moderate)', color: '#dc2626', textColor: '#ffffff' };
       } else {
-        result = { category: 'Obese', color: '#fecaca', textColor: '#b91c1c' };
+        result = { category: 'Obese Class III+ (Severe)', color: '#991b1b', textColor: '#ffffff' };
       }
     } else {
       if (bodyFat < 14) {
@@ -138,10 +152,16 @@ export default function BodyFatScreen() {
         result = { category: 'Fitness', color: '#dcfce7', textColor: '#16a34a' };
       } else if (bodyFat < 32) {
         result = { category: 'Average', color: '#fef3c7', textColor: '#a16207' };
-      } else if (bodyFat < 38) {
+      } else if (bodyFat < 39) {
         result = { category: 'Above Average', color: '#fed7aa', textColor: '#c2410c' };
+      } else if (bodyFat < 44) {
+        result = { category: 'Obese Class I (Mild)', color: '#fecaca', textColor: '#b91c1c' };
+      } else if (bodyFat < 49) {
+        result = { category: 'Obese Class II (Moderate)', color: '#dc2626', textColor: '#ffffff' };
+      } else if (bodyFat < 50) {
+        result = { category: 'Obese Class III (Severe)', color: '#991b1b', textColor: '#ffffff' };
       } else {
-        result = { category: 'Obese', color: '#fecaca', textColor: '#b91c1c' };
+        result = { category: 'Obese Class IV (Super)', color: '#7f1d1d', textColor: '#ffffff' };
       }
     }
     
@@ -278,10 +298,17 @@ export default function BodyFatScreen() {
       }
 
       // Set calculation result
-      const result = categorizeBodyFat(bodyFat, userGender as 'male' | 'female' || 'male');
+      console.log('Final calculation values:', { bodyFat, bmi, userGender });
+      
+      // Convert bodyFat to number if it's a string
+      const bodyFatNumber = typeof bodyFat === 'string' ? parseFloat(bodyFat) : bodyFat;
+      const bmiNumber = typeof bmi === 'string' ? parseFloat(bmi) : bmi;
+      
+      const result = categorizeBodyFat(bodyFatNumber, userGender as 'male' | 'female' || 'male');
+      console.log('Categorization result:', result);
       setCalculationResult({
-        bodyFat: bodyFat,
-        bmi: bmi,
+        bodyFat: bodyFatNumber,
+        bmi: bmiNumber,
         category: result.category,
         color: result.color,
         textColor: result.textColor
@@ -406,6 +433,9 @@ export default function BodyFatScreen() {
             <View style={styles.profileWarning}>
               <Text style={styles.profileWarningText}>
                 ⚠️ Please complete your profile to use the body fat calculator
+              </Text>
+              <Text style={styles.profileWarningText}>
+                Debug: userGender = {userGender === null ? 'null' : userGender === undefined ? 'undefined' : userGender}
               </Text>
             </View>
           )}
@@ -626,7 +656,7 @@ const styles = StyleSheet.create({
   zIndex: 2,
 },
   aiButtonText: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '600',
     color: '#0b0b0bff',
     marginBottom: 4,

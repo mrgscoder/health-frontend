@@ -188,7 +188,7 @@ export default function OxfordHappinessScreen() {
   if (showWelcome) {
     return (
       <LinearGradient
-        colors={['#FDE68A', '#FCA5A5', '#A5B4FC', '#6EE7B7']} // New gradient colors
+        colors={['#f4c4f3', '#f4c4f3', '#f4c4f3', '#f4c4f3']} // Solid background color
         style={styles.container}
       >
         <SafeAreaView style={styles.safeArea}>
@@ -241,7 +241,7 @@ export default function OxfordHappinessScreen() {
   if (showResult && result) {
     return (
       <LinearGradient
-        colors={['#FDE68A', '#FCA5A5', '#A5B4FC', '#6EE7B7']}
+        colors={['#f4c4f3', '#f4c4f3', '#f4c4f3', '#f4c4f3']}
         style={styles.container}
       >
         <SafeAreaView style={styles.safeArea}>
@@ -285,7 +285,7 @@ export default function OxfordHappinessScreen() {
   const progress = ((step + 1) / OXFORD_QUESTIONS.length) * 100;
   return (
     <LinearGradient
-      colors={['#FDE68A', '#FCA5A5', '#A5B4FC', '#6EE7B7']}
+      colors={['#f4c4f3', '#f4c4f3', '#f4c4f3', '#f4c4f3']}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>

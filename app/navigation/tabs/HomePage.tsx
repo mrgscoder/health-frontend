@@ -69,8 +69,6 @@ const HealthTrackerDashboard = () => {
     { id: 'bloodSugar', icon: require('../../../assets/icons/blood-sugar.png'), title: 'Blood Sugar', current: goals.bloodSugar.current, target: goals.bloodSugar.target, unit: ' mg/dL' },
     { id: 'bodyFat', icon: require('../../../assets/icons/body-fat.png'), title: 'Body Fat', current: goals.bodyFat.current, target: goals.bodyFat.target, unit: '%' },
     { id: 'stressAssessment', icon: require('../../../assets/icons/child.png'), title: 'Happiness' },
-    { id: 'analytics', icon: BarChart3, title: 'Analytics' },
-    { id: 'foodAnalytics', icon: Utensils, title: 'Food Analytics' },
   ];
 
   const positions: { [key: string]: { translateX: Animated.SharedValue<number>; translateY: Animated.SharedValue<number>; zIndex: Animated.SharedValue<number> } } = {
@@ -88,8 +86,6 @@ const HealthTrackerDashboard = () => {
     bloodSugar: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
     bodyFat: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
     stressAssessment: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
-    analytics: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
-    foodAnalytics: { translateX: useSharedValue(0), translateY: useSharedValue(0), zIndex: useSharedValue(0) },
   };
 
   const scrollViewRef = useRef<ScrollView>(null);
@@ -114,9 +110,7 @@ const HealthTrackerDashboard = () => {
           'cardio': 'cardio',
           'blood_sugar': 'bloodSugar',
           'body_fat': 'bodyFat',
-          'happiness_score': 'stressAssessment',
-          'analytics': 'analytics',
-          'food_analytics': 'foodAnalytics'
+          'happiness_score': 'stressAssessment'
         };
 
         // Create ordered stats based on backend sequence
@@ -170,9 +164,7 @@ const HealthTrackerDashboard = () => {
         'cardio': 'cardio',
         'bloodSugar': 'blood_sugar',
         'bodyFat': 'body_fat',
-        'stressAssessment': 'happiness_score',
-        'analytics': 'analytics',
-        'foodAnalytics': 'food_analytics'
+        'stressAssessment': 'happiness_score'
       };
 
       const cardSequence: CardPosition[] = newOrder.map((stat, index) => ({
@@ -339,14 +331,6 @@ const HealthTrackerDashboard = () => {
     }
     if (itemId === 'medicineTracking') {
       router.push('../../health/medicine');
-      return;
-    }
-    if (itemId === 'analytics') {
-      router.push('/record/Analytics');
-      return;
-    }
-    if (itemId === 'foodAnalytics') {
-      router.push('/navigation/tabs/foodList');
       return;
     }
 
