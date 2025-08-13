@@ -259,7 +259,7 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
       });
     } catch (error) {
       console.error('❌ Navigation error:', error);
-      router.push('/navigation/tabs');
+      router.push('/navigation/tabs/HomePage');
     }
   };
 

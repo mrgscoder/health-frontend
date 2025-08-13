@@ -592,16 +592,16 @@ const HealthTrackerDashboard = () => {
     <SafeAreaView className="flex-1">
       <LinearGradient
         colors={[
-          '#FFFFFF',
-          '#F8FFFF',
-          '#F0FFFF',
-          '#E8FFFF',
-          '#E0FFFF',
-          '#D8FFFF',
-          '#D0FFFF',
-          '#C8FFFF',
-          '#C0FFFF',
-          '#B8FFFF',
+          '#11B5CF',
+          '#0EA5BF',
+          '#0B95AF',
+          '#08859F',
+          '#05758F',
+          '#02657F',
+          '#01556F',
+          '#00455F',
+          '#00354F',
+          '#00253F',
         ]}
         style={{ flex: 1 }}
       >

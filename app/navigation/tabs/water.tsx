@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, ScrollView, Dimensions, Image, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ScrollView, Dimensions, Image, Switch, Vibration } from 'react-native';
 import * as Progress from 'react-native-progress';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
 import BASE_URL from "../../../src/config";
 
 const { width } = Dimensions.get('window');
@@ -61,10 +62,123 @@ const Water = () => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [userId, setUserId] = useState<number | null>(null); // Will be set from token
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [waterHistory, setWaterHistory] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [alarmSound, setAlarmSound] = useState(true);
+  const [alarmVibration, setAlarmVibration] = useState(true);
 
   const waterGoal = weight * 35;
   const glasses = Math.ceil(waterGoal / 250);
   const progress = Math.min(waterDrank / waterGoal, 1);
+
+  // Alarm Handler
+  useEffect(() => {
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Water alarm received:', notification);
+      
+      // Trigger local alarm effects
+      if (alarmVibration) {
+        // Vibrate pattern: wait 0ms, vibrate 500ms, wait 200ms, vibrate 500ms
+        Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+      }
+      
+      // Show alarm alert
+      Alert.alert(
+        '🚰 WATER ALARM!',
+        'Time to drink water! Stay hydrated! 💧',
+        [
+          {
+            text: 'Dismiss',
+            style: 'cancel',
+            onPress: () => Vibration.cancel(),
+          },
+          {
+            text: 'Add Water',
+            onPress: () => {
+              Vibration.cancel();
+              handleAddWater(250); // Add a glass of water
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    });
+
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Alarm response:', response);
+      Vibration.cancel();
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+      Vibration.cancel();
+    };
+  }, [alarmVibration]);
+
+  // FCM Token Management
+  const registerForPushNotifications = async () => {
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+      }
+      
+      const token = await Notifications.getExpoPushTokenAsync({
+        projectId: 'fe380462-c637-4c9e-bc58-a517394c8522', // Your Expo project ID
+      });
+      
+      console.log('Expo push token:', token.data);
+      
+      // Send token to backend
+      await updateFCMToken(token.data);
+      
+    } catch (error) {
+      console.error('Error getting push token:', error);
+    }
+  };
+
+  const updateFCMToken = async (fcmToken: string) => {
+    try {
+      const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+      if (token) {
+        console.log('Attempting to update FCM token...');
+        console.log('URL:', `${BASE_URL}/api/water/update-fcm-token`);
+        console.log('Token present:', !!token);
+        
+        const response = await fetch(`${BASE_URL}/api/water/update-fcm-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            fcm_token: fcmToken
+          }),
+        });
+        
+        if (response.ok) {
+          console.log('FCM token updated successfully');
+        } else {
+          const errorText = await response.text();
+          console.error('Failed to update FCM token:', response.status, errorText);
+        }
+      } else {
+        console.error('No authentication token available for FCM update');
+      }
+    } catch (error) {
+      console.error('Error updating FCM token:', error);
+    }
+  };
 
   // Using default user ID for now
 
@@ -225,16 +339,20 @@ const Water = () => {
     checkAchievements();
   }, [waterDrank, waterGoal, currentAchievement]);
 
-  // Load reminder settings on component mount
+  // Load reminder settings and register for push notifications on component mount
   useEffect(() => {
-    const loadReminderSettings = async () => {
+    const initializeApp = async () => {
+      // Register for push notifications
+      await registerForPushNotifications();
+      
+      // Load reminder settings
       try {
         // First try to load from database
         const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
         if (token) {
           try {
-                    // Get user's reminder preferences from database
-        const response = await fetch(`${BASE_URL}/api/water/get-reminder-preferences`, {
+            // Get user's reminder preferences from database
+            const response = await fetch(`${BASE_URL}/api/water/get-reminder-preferences`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -264,7 +382,7 @@ const Water = () => {
       }
     };
 
-    loadReminderSettings();
+    initializeApp();
   }, []);
 
   // Save reminder settings when changed
@@ -301,7 +419,7 @@ const Water = () => {
     }
   };
 
-  // Call reminders API every 2 minutes when reminders are enabled
+  // Call reminders API every 8 minutes when reminders are enabled
   useEffect(() => {
     let intervalId: number | null = null;
     
@@ -332,8 +450,8 @@ const Water = () => {
       // Call immediately
       callRemindersAPI();
       
-      // Set up interval for every 2 minutes (120000 ms)
-      intervalId = setInterval(callRemindersAPI, 120000);
+      // Set up interval for every 8 minutes (480000 ms)
+      intervalId = setInterval(callRemindersAPI, 480000);
     }
 
     return () => {
@@ -452,12 +570,7 @@ const Water = () => {
   const hydrationStatus = getHydrationStatus();
 
   return (
-    <LinearGradient
-      colors={['#E0F7FA', '#B2EBF2', '#4DD0E1', '#00ACC1']}
-      className="flex-1"
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-    >
+    <View className="flex-1" style={{ backgroundColor: '#E3F2FD' }}>
       <ScrollView className="flex-1">
         <View className="p-4">
         {/* Header with streak */}
@@ -510,7 +623,7 @@ const Water = () => {
               width={width - 80}
               height={20}
               color={hydrationStatus.color}
-              unfilledColor="rgba(255,255,255,0.2)"
+              unfilledColor="#E5E7EB"
               borderWidth={0}
               borderRadius={10}
             />
@@ -536,7 +649,7 @@ const Water = () => {
               <TouchableOpacity
                 key={cup.size}
                 onPress={() => handleAddWater(cup.size)}
-                className="border-2 border-white/30 rounded-xl p-3 m-1 items-center bg-white/10 backdrop-blur-sm"
+                className="border-2 border-blue-300/50 rounded-xl p-3 m-1 items-center bg-white/10 backdrop-blur-sm"
                 style={{ width: (width - 80) / 3 - 8 }}
               >
                 <MaterialCommunityIcons name={cup.icon} size={28} color="#2196F3" style={{ marginBottom: 4 }} />
@@ -550,23 +663,33 @@ const Water = () => {
         {/* Smart Reminders */}
         <View className="bg-white rounded-3xl p-4 mt-4 shadow-sm">
           <Text className="text-xl text-black font-semibold text-center mb-3">
-            Smart Reminders
+            🚰 Water Alarms
           </Text>
           
           <View className="flex-row items-center justify-center mb-3">
             <Text className="text-sm text-black/80 mr-2">
-              {remindersEnabled ? 'On' : 'Off'}
+              {remindersEnabled ? 'Alarms On' : 'Alarms Off'}
             </Text>
             <Switch
               value={remindersEnabled}
               onValueChange={handleReminderToggle}
-              trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#ffffff' }}
-              thumbColor={remindersEnabled ? '#11B5CF' : '#f3f4f6'}
+              trackColor={{ false: '#E5E7EB', true: '#11B5CF' }}
+              thumbColor={remindersEnabled ? '#ffffff' : '#9CA3AF'}
             />
           </View>
           
-          {remindersEnabled ? (
+          {remindersEnabled && (
             <>
+              <View className="flex-row items-center justify-between mb-3 px-4">
+                <Text className="text-sm text-black/80">Vibration</Text>
+                <Switch
+                  value={alarmVibration}
+                  onValueChange={setAlarmVibration}
+                  trackColor={{ false: '#E5E7EB', true: '#11B5CF' }}
+                  thumbColor={alarmVibration ? '#ffffff' : '#9CA3AF'}
+                />
+              </View>
+              
               <Text className="text-base text-black/80 text-center">
                 {getTimeUntilNextReminder()}
               </Text>
@@ -576,41 +699,130 @@ const Water = () => {
                 </Text>
               )}
             </>
-          ) : (
+          )}
+          
+          {!remindersEnabled && (
             <Text className="text-base text-black/60 text-center italic">
-              Reminders are currently disabled
+              Water alarms are currently disabled
             </Text>
           )}
         </View>
 
-        {/* Quick Stats */}
-        
-          <Text className="text-lg font-semibold text-black mb-3 text-center mt-8">
-            <MaterialCommunityIcons name="chart-bar" size={20} color="#2196F3" /> Today's Stats
+        {/* View History Button */}
+        <TouchableOpacity
+          onPress={async () => {
+            if (showHistory) {
+              setShowHistory(false);
+              return;
+            }
+            
+            setLoadingHistory(true);
+            try {
+              const token = await AsyncStorage.getItem('token') || await AsyncStorage.getItem('userToken');
+              if (token) {
+                const response = await fetch(`${BASE_URL}/api/water/history`, {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                  },
+                });
+                
+                if (response.ok) {
+                  const historyData = await response.json();
+                  console.log('Water intake history:', historyData);
+                  setWaterHistory(historyData);
+                  setShowHistory(true);
+                } else {
+                  const errorText = await response.text();
+                  Alert.alert('Error', `Failed to fetch history: ${response.status} ${errorText}`);
+                }
+              } else {
+                Alert.alert('Error', 'No token available to fetch history.');
+              }
+            } catch (error) {
+              console.error('Error fetching water history:', error);
+              Alert.alert('Error', 'An error occurred while fetching history.');
+            } finally {
+              setLoadingHistory(false);
+            }
+          }}
+          className="flex-row items-center justify-center bg-blue-100/20 backdrop-blur-sm border-2 border-blue-300/30 rounded-xl p-3 mb-4 mt-8"
+          style={{ alignSelf: 'center', width: width - 80 }}
+        >
+          <MaterialCommunityIcons name="history" size={22} color="#2196F3" style={{ marginRight: 8 }} />
+          <Text className="text-base font-semibold text-black">
+            {loadingHistory ? 'Loading...' : showHistory ? 'Hide History' : 'View History'}
           </Text>
-          <View className="flex-row justify-around">
-            <View className="items-center">
-                              <MaterialCommunityIcons name="cup" size={29} color="#2196F3" />
-                <Text className="text-lg font-semibold text-black">
-                  {Math.floor(waterDrank / 250)}
+        </TouchableOpacity>
+
+        {/* Water History Display */}
+        {showHistory && (
+          <View className="bg-white rounded-3xl p-4 mb-8 shadow-sm">
+            <Text className="text-xl text-black font-semibold text-center mb-4">
+              Water Intake History
+            </Text>
+            
+            {waterHistory.length > 0 ? (
+              <ScrollView className="max-h-80">
+                {waterHistory.map((entry, index) => {
+                  const date = new Date(entry.date).toLocaleDateString();
+                  const intake = entry.total_intake || 0;
+                  const goal = entry.goal || 2100;
+                  const percentage = entry.percentage || 0;
+                  
+                  return (
+                    <View key={index} className="border-b border-gray-200 py-3 last:border-b-0">
+                      <View className="flex-row justify-between items-center mb-2">
+                        <Text className="text-base font-semibold text-black">{date}</Text>
+                        <View className="flex-row items-center">
+                          <MaterialCommunityIcons 
+                            name={entry.goal_achieved ? "trophy" : "cup"} 
+                            size={20} 
+                            color={entry.goal_achieved ? "#f1ca00" : "#2196F3"} 
+                          />
+                          <Text className="text-sm text-black/60 ml-1">
+                            {entry.goal_achieved ? 'Goal Met!' : 'In Progress'}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-sm text-black/80">
+                          {intake}ml / {goal}ml
+                        </Text>
+                        <Text className="text-sm font-semibold text-black">
+                          {percentage}%
+                        </Text>
+                      </View>
+                      
+                      <View className="mt-2">
+                        <Progress.Bar
+                          progress={percentage / 100}
+                          width={width - 120}
+                          height={8}
+                          color={percentage >= 100 ? "#f1ca00" : "#2196F3"}
+                          unfilledColor="rgba(0,0,0,0.1)"
+                          borderWidth={0}
+                          borderRadius={4}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View className="items-center py-8">
+                <MaterialCommunityIcons name="water-off" size={48} color="#2196F3" />
+                <Text className="text-base text-black/60 text-center mt-2">
+                  No water intake history available yet.
                 </Text>
-                <Text className="text-sm text-black/80">Glasses</Text>
-            </View>
-            <View className="items-center">
-                              <MaterialCommunityIcons name="target" size={29} color="#2196F3" />
-                <Text className="text-lg font-semibold text-black">
-                  {Math.round(progress * 100)}%
+                <Text className="text-sm text-black/40 text-center mt-1">
+                  Start tracking your water intake to see your history here!
                 </Text>
-                <Text className="text-sm text-black/80">Complete</Text>
-            </View>
-            <View className="items-center">
-                              <MaterialCommunityIcons name="fire" size={29} color="#2196F3" />
-                <Text className="text-lg font-semibold text-black">
-                  {streak}
-                </Text>
-                <Text className="text-sm text-black/80">Day Streak</Text>
-            </View>
+              </View>
+            )}
           </View>
+        )}
      
 
         {/* Restart Day Button */}
@@ -623,7 +835,7 @@ const Water = () => {
           <Text className="text-base font-semibold text-black">Restart Day</Text>
         </TouchableOpacity>
 
-        {/* Send Reminder Button */}
+        {/* Test Alarm Button */}
         <TouchableOpacity
           onPress={async () => {
             try {
@@ -636,28 +848,38 @@ const Water = () => {
                   },
                 });
                 if (response.ok) {
-                  Alert.alert('Success', 'Reminder sent successfully!');
+                  Alert.alert('Success', 'Water alarm sent successfully!');
                 } else {
                   const errorText = await response.text();
-                  Alert.alert('Error', `Failed to send reminder: ${response.status} ${errorText}`);
+                  Alert.alert('Error', `Failed to send alarm: ${response.status} ${errorText}`);
                 }
               } else {
-                Alert.alert('Error', 'No token available to send reminder.');
+                Alert.alert('Error', 'No token available to send alarm.');
               }
             } catch (error) {
-              Alert.alert('Error', 'An error occurred while sending reminder.');
+              Alert.alert('Error', 'An error occurred while sending alarm.');
             }
           }}
-          className="flex-row items-center justify-center bg-blue-100/20 backdrop-blur-sm border-2 border-blue-300/30 rounded-xl p-3 mb-8"
+          className="flex-row items-center justify-center bg-blue-100/20 backdrop-blur-sm border-2 border-blue-300/30 rounded-xl p-3 mb-4"
           style={{ alignSelf: 'center', width: width - 80 }}
         >
-          <MaterialCommunityIcons name="bell" size={22} color="#2196F3" style={{ marginRight: 8 }} />
-          <Text className="text-base font-semibold text-black">Send Reminder Now</Text>
+          <MaterialCommunityIcons name="alarm" size={22} color="#2196F3" style={{ marginRight: 8 }} />
+          <Text className="text-base font-semibold text-black">Test Water Alarm</Text>
+        </TouchableOpacity>
+
+        {/* Register for Alarms Button */}
+        <TouchableOpacity
+          onPress={registerForPushNotifications}
+          className="flex-row items-center justify-center bg-green-100/20 backdrop-blur-sm border-2 border-green-300/30 rounded-xl p-3 mb-8"
+          style={{ alignSelf: 'center', width: width - 80 }}
+        >
+          <MaterialCommunityIcons name="alarm" size={22} color="#2196F3" style={{ marginRight: 8 }} />
+          <Text className="text-base font-semibold text-black">Register for Water Alarms</Text>
         </TouchableOpacity>
 
         </View>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 };
 
