@@ -17,17 +17,6 @@ const StepCounter = () => {
   const [loading, setLoading] = useState(false);
   const [weeklyData, setWeeklyData] = useState<Record<string, any>>({});
 
-  // Static data for other days (for now)
-  const stepData: Record<number, { steps: number; miles: number; minutes: number; calories: number; floors: number }> = {
-    0: { steps: 4200, miles: 2.1, minutes: 63, calories: 254, floors: 1 },
-    1: { steps: 6800, miles: 3.4, minutes: 102, calories: 408, floors: 3 },
-    2: { steps: 7200, miles: 3.6, minutes: 108, calories: 432, floors: 2 },
-    3: { steps: 5700, miles: 2.7, minutes: 81, calories: 321, floors: 2 },
-    4: { steps: 8100, miles: 4.1, minutes: 122, calories: 486, floors: 4 },
-    5: { steps: 3200, miles: 1.6, minutes: 48, calories: 192, floors: 1 },
-    6: { steps: 2800, miles: 1.4, minutes: 42, calories: 168, floors: 1 },
-  };
-
   // Load weekly data from backend
   const loadWeeklyData = async () => {
     try {
@@ -162,7 +151,7 @@ const StepCounter = () => {
     return dayNames[dayIndex];
   };
 
-  // Get data for current day - use backend data if available, otherwise static data
+  // Get data for current day - use backend data if available, otherwise real-time data
   const getCurrentDayData = () => {
     const today = getCurrentDayName(currentDay);
     const backendData = weeklyData[today];
@@ -187,13 +176,13 @@ const StepCounter = () => {
         floors: backendData.floors || 0,
       };
     } else {
-      // Fallback to static data
+      // No data available - return zeros
       return {
-        steps: stepData[currentDay]?.steps || 0,
-        miles: stepData[currentDay]?.miles || 0,
-        minutes: stepData[currentDay]?.minutes || 0,
-        calories: stepData[currentDay]?.calories || 0,
-        floors: stepData[currentDay]?.floors || 0,
+        steps: 0,
+        miles: 0,
+        minutes: 0,
+        calories: 0,
+        floors: 0,
       };
     }
   };
@@ -281,12 +270,7 @@ const StepCounter = () => {
   };
 
   return (
-    <LinearGradient
-      colors={['#D1FAE5', '#86EFAC', '#4ADE80', '#22C55E']}
-      className="flex-1"
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-    >
+    <View className="flex-1" style={{ backgroundColor: '#73C8A9' }}>
       <View className="flex-1" style={{ paddingTop: insets.top }}>
         {/* Header */}
         <View className="px-6 py-4">
@@ -390,7 +374,7 @@ const StepCounter = () => {
           </View>
         </ScrollView>
       </View>
-    </LinearGradient>
+    </View>
   );
 };
 
