@@ -60,13 +60,13 @@ const WelcomeScreen = () => {
       style={{ flex: 1 }}
     >
       <SafeAreaView className="flex-1">
-        <StatusBar barStyle="light-content" backgroundColor="#11B5CF" />
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
         <View className="flex-1 items-center px-6 pt-10 pb-8">
 
           {/* App Name - At the top */}
           <View className="items-center mb-8 mt-6">
-            <Text className="text-white  font-serif  text-4xl ">HealthSync</Text>
+            <Text className="text-white font-serif text-4xl">HealthSync</Text>
           </View>
 
           {/* Heart Animation - Moved higher and larger */}
@@ -93,10 +93,10 @@ const WelcomeScreen = () => {
 
             <TouchableOpacity
               onPress={handleAlreadyHaveAccount}
-              className="border border-white rounded-full py-3"
+              className="border border-[#11B5CF] rounded-full py-3"
               activeOpacity={0.8}
             >
-              <Text className="text-white text-base font-semibold text-center">
+              <Text className="text-[#11B5CF] text-base font-semibold text-center">
                 I Already Have an Account
               </Text>
             </TouchableOpacity>

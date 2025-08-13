@@ -393,9 +393,8 @@ const FoodDiary = () => {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowCalendarModal(false)}
       >
-                 <LinearGradient
-           colors={['#E6F4EA', '#C3E6D2', '#A0D8BA']}
-           className="flex-1"
+                 <View
+           style={{ flex: 1, backgroundColor: '#d6f3a0' }}
          >
           <View className="px-4 py-6 border-b border-gray-200">
             <View className="flex-row justify-between items-center">
@@ -481,7 +480,7 @@ const FoodDiary = () => {
               ))}
             </View>
           </View>
-        </LinearGradient>
+        </View>
       </Modal>
     );
   };
@@ -1100,11 +1099,8 @@ const FoodDiary = () => {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-             <LinearGradient
-         colors={['#E6F4EA', '#C3E6D2', '#A0D8BA']}
-         style={{ flex: 1 }}
-         start={{ x: 0, y: 0 }}
-         end={{ x: 0, y: 1 }}
+             <View
+         style={{ flex: 1, backgroundColor: '#d6f3a0' }}
        >
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Header */}
@@ -1139,6 +1135,15 @@ const FoodDiary = () => {
           </View>
         </View>
 
+        {/* Last Meal Fullness Heading - Only show for today */}
+        {selectedDate.toDateString() === new Date().toDateString() && digestiveTimeline.length > 0 && (
+          <View className="mb-4 mx-8 p-3 bg-green-100 rounded-xl border border-green-200">
+                          <Text className="text-center text-green-800 text-sm font-medium">
+                Your {digestiveTimeline[digestiveTimeline.length - 1]?.category || 'last meal'} will keep you full for approximately {digestiveTimeline[digestiveTimeline.length - 1]?.totalDigestionTime || 0} hours
+              </Text>
+          </View>
+        )}
+
         <View className="px-4 py-3">
         {loadingSavedData ? (
           <View className="flex-1 justify-center items-center py-10">
@@ -1146,19 +1151,19 @@ const FoodDiary = () => {
           </View>
         ) : (
                      meals.map((meal) => (
-             <View key={meal} className="mb-6 p-4 bg-green-50 rounded-2xl shadow-md border border-green-200">
+             <View key={meal} className="mb-6 p-4 rounded-2xl border-2 border-lime-500" style={{ backgroundColor: 'transparent' }}>
               <View className="flex-row items-center mb-3">
                 {meal === 'Breakfast' && (
-                  <MaterialCommunityIcons name="food-croissant" size={24} color="black" />
+                  <MaterialCommunityIcons name="food-croissant" size={24} color="#65A30D" />
                 )}
                 {meal === 'Lunch' && (
-                  <MaterialCommunityIcons name="food-variant" size={24} color="black" />
+                  <MaterialCommunityIcons name="food-variant" size={24} color="#65A30D" />
                 )}
                 {meal === 'Dinner' && (
-                  <MaterialCommunityIcons name="food-fork-drink" size={24} color="black" />
+                  <MaterialCommunityIcons name="food-fork-drink" size={24} color="#65A30D" />
                 )}
                 {meal === 'Snack' && (
-                  <MaterialCommunityIcons name="food-apple" size={24} color="black" />
+                  <MaterialCommunityIcons name="food-apple" size={24} color="#65A30D" />
                 )}
                 <Text className="text-xl font-semibold text-gray-800 ml-2">{meal}</Text>
               </View>
@@ -1174,7 +1179,8 @@ const FoodDiary = () => {
               )}
 
                              <TouchableOpacity 
-                 className="border-2 border-lime-500 px-4 py-2 rounded-xl"
+                 className="bg-white px-4 py-2"
+                 style={{ borderRadius: 50 }}
                  onPress={() => handleAddFood(meal)}
                  disabled={loading}
                >
@@ -1184,17 +1190,6 @@ const FoodDiary = () => {
                </TouchableOpacity>
             </View>
           ))
-        )}
-
-
-
-        {/* Last Meal Fullness Heading - Only show for today */}
-        {selectedDate.toDateString() === new Date().toDateString() && digestiveTimeline.length > 0 && (
-          <View className="mb-4 p-3 bg-green-100 rounded-xl border border-green-200">
-            <Text className="text-center text-green-800 font-semibold">
-              Your {digestiveTimeline[digestiveTimeline.length - 1]?.category || 'last meal'} will keep you full for ~{digestiveTimeline[digestiveTimeline.length - 1]?.totalDigestionTime || 0} hours
-            </Text>
-          </View>
         )}
 
         {/* Digestive Timeline Section - Only show for today */}
@@ -1289,7 +1284,7 @@ const FoodDiary = () => {
                 className="h-full rounded-full"
                 style={{ 
                   width: `${calculateProgress().calories}%`,
-                  backgroundColor: '#d1eef7'
+                  backgroundColor: '#a8d4e6'
                 }}
               />
             </View>
@@ -1305,7 +1300,7 @@ const FoodDiary = () => {
                 className="h-full rounded-full"
                 style={{ 
                   width: `${calculateProgress().carbs}%`,
-                  backgroundColor: '#e8d9f7'
+                  backgroundColor: '#c4a8e6'
                 }}
               />
             </View>
@@ -1321,7 +1316,7 @@ const FoodDiary = () => {
                 className="h-full rounded-full"
                 style={{ 
                   width: `${calculateProgress().fat}%`,
-                  backgroundColor: '#e8f5e8'
+                  backgroundColor: '#a8d4a8'
                 }}
               />
             </View>
@@ -1337,7 +1332,7 @@ const FoodDiary = () => {
                 className="h-full rounded-full"
                 style={{ 
                   width: `${calculateProgress().protein}%`,
-                  backgroundColor: '#f7f4d9'
+                  backgroundColor: '#e6d4a8'
                 }}
               />
             </View>
@@ -1354,9 +1349,8 @@ const FoodDiary = () => {
         onRequestClose={() => setShowFoodModal(false)}
       >
                  <View className="flex-1 bg-black/50 justify-end">
-           <LinearGradient
-             colors={['#d6f3a0', '#c4e88a', '#8bc34a']}
-              className="bg-white rounded-t-3xl p-6 h-[80%]"
+           <View
+             style={{ backgroundColor: '#d6f3a0', borderRadius: 24, padding: 24, height: '80%' }}
             >
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-2xl font-bold text-gray-800">{selectedMeal} Foods</Text>
@@ -1427,7 +1421,7 @@ const FoodDiary = () => {
                 className="flex-1"
               />
             )}
-          </LinearGradient>
+          </View>
         </View>
       </Modal>
 
@@ -1439,9 +1433,8 @@ const FoodDiary = () => {
         onRequestClose={() => setShowAddFoodModal(false)}
       >
                  <View className="flex-1 bg-black/50 justify-center px-5">
-           <LinearGradient
-             colors={['#d6f3a0', '#c4e88a', '#8bc34a']}
-              className="bg-white rounded-3xl p-6 max-h-[80%]"
+           <View
+             style={{ backgroundColor: '#d6f3a0', borderRadius: 24, padding: 24, maxHeight: '80%' }}
             >
             <View className="flex-row justify-between items-center mb-5">
               <Text className="text-2xl font-bold text-gray-800">Add Custom Food</Text>
@@ -1517,11 +1510,11 @@ const FoodDiary = () => {
                 <Text className="text-white text-base font-semibold">Add to {selectedMeal}</Text>
               </TouchableOpacity>
             </ScrollView>
-          </LinearGradient>
+          </View>
         </View>
       </Modal>
       {CalendarModal()}
-    </LinearGradient>
+    </View>
     </SafeAreaView>
   );
 };
