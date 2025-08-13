@@ -186,9 +186,10 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
 
   // Gender-specific protein needs: Females 1.0-1.4g/kg, Males 0.8-1.2g/kg
   const proteinRange = gender === 'Female' ? '1.0-1.4g' : '0.8-1.2g';
-  const proteinRecommendation = `Incorporate protein-rich foods like ${proteinSources[selectedDiet].slice(0, 3).join(', ')} into your ${dietPreference || 'Balanced'} diet to support ${healthGoal || 'General Wellness'}. Aim for ${proteinRange} of protein per kg of body weight daily. Try recipes like ${selectedDiet === 'Vegan' ? 'dal tadka or tofu bhurji' : selectedDiet === 'Vegetarian' ? 'paneer tikka or chana masala' : 'chicken curry or fish fry'}.`;
-
-  const dietRecommendation = `${proteinRecommendation} For ${healthGoal || 'General Wellness'}, include ${healthGoal === 'Weight Loss' ? 'high-protein, low-calorie meals like dal with roti' : healthGoal === 'Gain Muscle' ? 'protein-heavy meals with complex carbs like paneer paratha' : 'balanced meals with whole grains like brown rice and dal'}.`;
+  const proteinRecommendation = ` Incorporate protein-rich foods like ${proteinSources[selectedDiet].slice(0, 3).join(', ')} into your ${dietPreference || 'Balanced'} diet to support ${healthGoal || 'General Wellness'}.
+Aim for ${proteinRange} of protein per kg of body weight daily.
+Try recipes like ${selectedDiet === 'Vegan' ? 'dal tadka or tofu bhurji' : selectedDiet === 'Vegetarian' ? 'paneer tikka or chana masala' : 'chicken curry or fish fry'}.
+For ${healthGoal || 'General Wellness'}, include ${healthGoal === 'Weight Loss' ? 'high-protein, low-calorie meals like dal with roti' : healthGoal === 'Gain Muscle' ? 'protein-heavy meals with complex carbs like paneer paratha' : 'balanced meals with whole grains like brown rice and dal'}.`;
 
   const sleepRecommendation = sleepHoursNum < 6
     ? 'Aim for 7-8 hours of sleep with a consistent bedtime routine to improve recovery.'
@@ -208,13 +209,6 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
   ];
 
   const randomQuote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
-
-  // Enhanced Health Roadmap with Indian Context and Gender Adjustment
-  const roadmap = [
-    `Step 1: ${(healthGoal || 'General Wellness') === 'Weight Loss' ? 'Walk 10,000 steps daily' : healthGoal === 'Gain Muscle' ? 'Start a strength training routine 3x/week' : 'Set a daily health goal'}.`,
-    `Step 2: Include ${proteinSources[selectedDiet][0]} in at least one meal daily, like ${selectedDiet === 'Vegan' ? 'dal with rice' : selectedDiet === 'Vegetarian' ? 'paneer sabzi' : 'chicken curry'}.`,
-    `Step 3: Track your ${healthGoal?.toLowerCase() || 'health'} progress in the app!`,
-  ];
 
   // Initialize router from expo-router for navigation
   const router = useRouter();
@@ -239,10 +233,9 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
         healthScore: healthScore.toString(),
         healthScoreCategory,
         activityRecommendation,
-        dietRecommendation,
+        proteinRecommendation,
         sleepRecommendation,
         stressRecommendation,
-        roadmap: JSON.stringify(roadmap),
         motivationalQuote: randomQuote
       };
 
@@ -377,13 +370,20 @@ const Result: React.FC<ResultProps> = ({ route, height: propHeight, weight: prop
               </View>
 
               {/* Diet Recommendation */}
-              <View className="p-4 mb-4">
-                <View className="flex-row items-center mb-2">
-                  <Ionicons name="restaurant-outline" size={24} color="#11B5CF" style={{ marginRight: 8 }} />
-                  <Text className="text-lg font-bold text-[#11B5CF]">Diet</Text>
-                </View>
-                <Text className="text-sm text-gray-700 leading-6">{dietRecommendation}</Text>
-              </View>
+<View className="p-4 mb-4">
+  <View className="flex-row items-center mb-2">
+    <Ionicons name="restaurant-outline" size={24} color="#11B5CF" style={{ marginRight: 8 }} />
+    <Text className="text-lg font-bold text-[#11B5CF]">Diet</Text>
+  </View>
+
+  {proteinRecommendation.split('\n').map((line, index) => (
+    <Text key={index} style={{ marginBottom: 4 }}>
+      <Text style={{ fontSize: 20, color: '#11B5CF' }}>{'\u2022 '}</Text>
+      <Text className="text-sm text-gray-700 leading-6">{line.replace(/^\u2022\s*/, '')}</Text>
+    </Text>
+  ))}
+</View>
+
 
               {/* Sleep Recommendation */}
               <View className="p-4">
