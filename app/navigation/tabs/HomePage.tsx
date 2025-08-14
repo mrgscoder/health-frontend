@@ -31,6 +31,7 @@ interface Stat {
 }
 
 const HealthTrackerDashboard = () => {
+  console.log('🏠 HomePage: Component loaded');
   const router = useRouter();
   const [currentDate] = useState(new Date());
   const [selectedItems, setSelectedItems] = useState(new Set<string>());

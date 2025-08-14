@@ -1,11 +1,21 @@
 import { useEffect } from 'react';
 import { router } from 'expo-router';
+import { View, Text } from 'react-native';
 
 export default function RootIndex() {
   useEffect(() => {
-    // Redirect to the health index page
-    router.replace('/health/index');
+    // Use a small delay to ensure the layout is properly mounted
+    const timer = setTimeout(() => {
+      router.replace('/health');
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  return null; // This component doesn't render anything
+  // Return a loading component instead of null
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Loading...</Text>
+    </View>
+  );
 } 

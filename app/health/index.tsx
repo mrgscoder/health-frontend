@@ -15,7 +15,7 @@ const WelcomeScreen = () => {
       if (isAuthenticated) {
         console.log('✅ User is authenticated, redirecting to dashboard');
         // User is already logged in, redirect to dashboard
-        router.replace('/navigation/tabs');
+        router.replace('/navigation/tabs/HomePage');
       } else {
         console.log('❌ User is not authenticated, staying on welcome screen');
       }
@@ -35,7 +35,7 @@ const WelcomeScreen = () => {
     if (isAuthenticated) {
       console.log('✅ User is authenticated, redirecting to dashboard');
       // User is already logged in, redirect to dashboard
-      router.replace('/navigation/tabs');
+      router.replace('/navigation/tabs/HomePage');
     } else {
       console.log('❌ User is not authenticated, going to Account page');
       // User needs to login, go to Account page

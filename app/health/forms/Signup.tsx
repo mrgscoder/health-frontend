@@ -234,7 +234,7 @@ const SignUpPage = () => {
         console.log('Health data included in registration request');
         
         // Navigate directly to main app without showing success alert
-        router.push('/navigation/tabs');
+        router.push('/navigation/tabs/HomePage');
       } else {
         alert('Registration failed: ' + (registerResponse.data?.message || 'Unknown error'));
       }

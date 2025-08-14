@@ -252,7 +252,7 @@ For ${healthGoal || 'General Wellness'}, include ${healthGoal === 'Weight Loss' 
       });
     } catch (error) {
       console.error('❌ Navigation error:', error);
-      router.push({ pathname: '/navigation/tabs/food'});
+      // Removed fallback navigation to food.tsx
     }
   };
 
