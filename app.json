@@ -4,7 +4,7 @@
     "slug": "HealthSync",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icons/child.png",
+    "icon": "./assets/icons/heart.png",
     "scheme": "healthsync",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,

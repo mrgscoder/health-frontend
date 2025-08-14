@@ -94,8 +94,8 @@ const TemperatureTracker = () => {
           const notes = record.notes || record.notes_text || '';
           const timestamp = record.date_time || record.recorded_at || record.timestamp || record.created_at;
           
-          // Only include valid records
-          if (!record.id || isNaN(temperature) || temperature <= 0 || temperature > 50 || !timestamp) {
+          // More reasonable temperature validation - allow up to 120°F (48.9°C) for fever cases
+          if (!record.id || isNaN(temperature) || temperature <= 0 || temperature > 120 || !timestamp) {
             console.warn('Invalid temperature record found:', record);
             return null;
           }
@@ -167,13 +167,13 @@ const TemperatureTracker = () => {
       return false;
     }
 
-    if (unit === 'C' && (tempValue < 30 || tempValue > 45)) {
-      Alert.alert('Error', 'Temperature should be between 30-45°C');
+    if (unit === 'C' && (tempValue < 30 || tempValue > 50)) {
+      Alert.alert('Error', 'Temperature should be between 30-50°C');
       return false;
     }
 
-    if (unit === 'F' && (tempValue < 86 || tempValue > 113)) {
-      Alert.alert('Error', 'Temperature should be between 86-113°F');
+    if (unit === 'F' && (tempValue < 86 || tempValue > 122)) {
+      Alert.alert('Error', 'Temperature should be between 86-122°F');
       return false;
     }
 
@@ -267,7 +267,7 @@ const TemperatureTracker = () => {
       });
       
       // Validate the temperature value - ensure it's a valid number
-      if (temp == null || isNaN(temp) || temp <= 0 || temp > 50) {
+      if (temp == null || isNaN(temp) || temp <= 0 || temp > 120) {
         console.warn('Invalid temperature value for chart:', record);
         return null;
       }
@@ -287,7 +287,7 @@ const TemperatureTracker = () => {
                    !isNaN(item.temperature) && 
                    typeof item.temperature === 'number' &&
                    item.temperature > 0 &&
-                   item.temperature <= 50;
+                   item.temperature <= 120;
     if (!isValid && item !== null) {
       console.warn('Filtering out invalid temperature data:', item);
     }
@@ -346,6 +346,8 @@ const TemperatureTracker = () => {
       
       // Handle the correct API response format
       const records = responseData.records || responseData;
+      console.log('Raw records array:', records);
+      console.log('Records length:', records.length);
       
       if (!Array.isArray(records)) {
         console.error('API response is not an array:', responseData);
@@ -354,12 +356,21 @@ const TemperatureTracker = () => {
       }
       
       const formattedRecords = records.map((record: any) => {
+        console.log('Processing record:', record);
         const temperature = parseFloat(record.temperature || record.temp_value || 0);
         const unit = record.unit || 'C';
         const notes = record.notes || record.notes_text || '';
         const timestamp = record.date_time || record.recorded_at || record.timestamp || record.created_at;
-        if (!record.id || isNaN(temperature) || temperature <= 0 || temperature > 50 || !timestamp) {
+        
+        console.log('Parsed values:', { temperature, unit, notes, timestamp, id: record.id });
+        
+        if (!record.id || isNaN(temperature) || temperature <= 0 || temperature > 120 || !timestamp) {
           console.warn('Invalid temperature record found:', record);
+          console.warn('Validation failed:', { 
+            hasId: !!record.id, 
+            isValidTemp: !isNaN(temperature) && temperature > 0 && temperature <= 120, 
+            hasTimestamp: !!timestamp 
+          });
           return null;
         }
         return {
@@ -479,15 +490,15 @@ const TemperatureTracker = () => {
                   !isNaN(d.temperature) && 
                   typeof d.temperature === 'number' &&
                   d.temperature > 0 &&
-                  d.temperature <= 50
+                  d.temperature <= 120
                 );
                 
                 if (validChartData.length > 0) {
                   try {
                     // Ensure all data points are valid numbers
                     const chartValues = validChartData.map(d => {
-                      const value = Number(d.temperature);
-                      return isNaN(value) || value <= 0 || value > 50 ? 36.5 : value; // fallback to normal temp
+                                          const value = Number(d.temperature);
+                    return isNaN(value) || value <= 0 || value > 120 ? 36.5 : value; // fallback to normal temp
                     });
                     
                     return (
