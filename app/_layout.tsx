@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Slot } from "expo-router";
 import './globals.css'
 import { useEffect, useRef } from 'react';
 import { registerForPushNotificationsAsync } from './usePushNotifications';
@@ -54,87 +54,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <Stack>
-          <Stack.Screen
-            name="health/index"
-            options={{
-              headerShown: false,
-            }}
-          />
-
-          <Stack.Screen
-            name="navigation/tabs"
-            options={{
-              headerShown: false,
-            }}
-          />
-            <Stack.Screen
-            name="health/Account"
-            options={{
-              headerShown: false,
-            }}
-          />
-           <Stack.Screen
-            name="health/forms"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="health/forgot"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="record"
-            options={{
-              headerShown: false,
-            }}/>
-            <Stack.Screen
-            name="stress-assessment"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="health/medication"
-            options={{
-              headerShown: false,
-            }}
-            />
-          <Stack.Screen
-           name="medicine-tracking"
-           options={{ 
-             headerShown: false,
-           }}   
-           />
-          <Stack.Screen
-            name="record/Cardio"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="record/ExerciseTimer"
-            options={{
-              headerShown: false,
-            }}
-          />
-
-          <Stack.Screen
-            name="health/medicine"
-            options={{
-              headerShown: false,
-            }}
-            />
-          <Stack.Screen
-            name="health/profile"
-            options={{
-              headerShown: false,
-            }}
-            />
-        </Stack>
+        <Slot />
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

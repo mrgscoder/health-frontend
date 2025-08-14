@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "HealthSync",
-    "slug": "HealthSync",
+    "slug": "healthcare",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icons/heart.png",
@@ -21,7 +21,10 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.HealthSync"
+      "package": "com.anonymous.HealthSync",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -45,7 +48,9 @@
         {
           "icon": "./assets/icons/child.png",
           "color": "#ffffff",
-          "sounds": ["./assets/sounds/notification.wav"]
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ]
         }
       ],
       [
@@ -62,8 +67,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "fe380462-c637-4c9e-bc58-a517394c8522"
+        "projectId": "dc1832d7-e40f-4a1b-819b-39d18f555b3f"
       }
-    }
+    },
+    "owner": "sadafnew"
   }
 }
