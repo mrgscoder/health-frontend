@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Activity, History, Zap, Target, TrendingUp } from 'lucide-react-native';
-import BASE_URL from "../../src/config";
+import { Activity, History } from 'lucide-react-native';
 import moment from 'moment';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import BASE_URL from "../../src/config";
 
 type CardioHistoryItem = {
   id: number;
@@ -78,19 +78,35 @@ const WorkoutHome = () => {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <LinearGradient
-        colors={['#e0f7fa', '#c8e6c9']}
+        colors={['#c8e6c9', '#c8e6c9']}
         style={{ flex: 1 }}
       >
         <ScrollView style={{ flex: 1 }}>
           {/* Main Content */}
           <View style={styles.container}>
             {/* Cardio Heading */}
-            <Text style={styles.cardioHeading}>Cardio</Text>
+            <Text style={styles.cardioHeading}>Exercise</Text>
+            
+            {/* Personalized Health Box */}
+            <View style={styles.personalizedContainer}>
+              <Text style={styles.personalizedText}>
+                Based on your health profile, fitness level, and goals, 
+                we've customized your cardio workouts to match your body's needs and capabilities.
+              </Text>
+            </View>
+
             {/* Motivational Quote */}
-            <View style={styles.quoteContainer}>
-              <Text style={styles.quoteText}>"{currentQuote}"</Text>
-              <View style={styles.quoteIcon}>
-                <Zap size={20} color="#00BCD4" />
+
+            {/* Inspiring Image */}
+            <View>
+              <View style={styles.imagePlaceholder}>
+                <Activity size={0} color="#00BCD4" />
+                <Image
+                  source={require('../../assets/images/work.png')}
+                  style={{ width: 350, height: 250 }}
+                  />
+                <Text style={styles.imageText}></Text>
+                <Text style={styles.imageText}>Every step counts towards your goal</Text>
               </View>
             </View>
 
@@ -101,7 +117,7 @@ const WorkoutHome = () => {
                 onPress={handleStartWorkout}
                 activeOpacity={0.85}
               >
-                <Activity size={24} color="#fff" style={{ marginRight: 8 }} />
+                <Activity size={24} color="#6b8d6cff" style={{ marginRight: 8 }} />
                 <Text style={styles.workoutButtonText}>Start Workout</Text>
               </TouchableOpacity>
               
@@ -110,37 +126,20 @@ const WorkoutHome = () => {
                 onPress={handleViewHistory}
                 activeOpacity={0.85}
               >
-                <History size={24} color="#00BCD4" style={{ marginRight: 8 }} />
-                <Text style={styles.historyButtonText}>View History</Text>
+                <History size={24} color="#6b8d6cff" style={{ marginRight: 8 }} />
+                <Text style={styles.historyButtonText}>Track Your Exercise Record</Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Motivational Tips */}
-            <View style={styles.tipsContainer}>
-              <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
-                <Activity size={20} color="#00BCD4" style={{marginRight: 8}} />
-                <Text style={styles.tipsTitle}>Today's Tips</Text>
-              </View>
-              <View style={styles.tipItem}>
-                <Text style={styles.tipText}>• Start with a 5-minute warm-up</Text>
-              </View>
-              <View style={styles.tipItem}>
-                <Text style={styles.tipText}>• Stay hydrated throughout your workout</Text>
-              </View>
-              <View style={styles.tipItem}>
-                <Text style={styles.tipText}>• Listen to your body and rest when needed</Text>
-              </View>
             </View>
           </View>
 
           {/* History Modal */}
           <Modal visible={historyVisible} animationType="slide" onRequestClose={() => setHistoryVisible(false)}>
             <LinearGradient
-              colors={['#e0f7fa', '#c8e6c9']}
+              colors={['#c8e6c9', '#c8e6c9']}
               style={{ flex: 1 }}
             >
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Workout History</Text>
+                <Text style={styles.modalTitle}>Exercise Records</Text>
                 <TouchableOpacity onPress={() => setHistoryVisible(false)} style={styles.closeButton}>
                   <Text style={styles.closeButtonText}>Close</Text>
                 </TouchableOpacity>
@@ -161,17 +160,17 @@ const WorkoutHome = () => {
                 {!loading && history.length === 0 && !error && (
                   <View style={styles.emptyState}>
                     <History size={48} color="#ccc" />
-                    <Text style={styles.emptyText}>No workout history yet.</Text>
+                    <Text style={styles.emptyText}>No exercise records yet.</Text>
                     <Text style={styles.emptySubtext}>Start your fitness journey today!</Text>
                   </View>
                 )}
               </ScrollView>
             </LinearGradient>
           </Modal>
-                  </ScrollView>
-        </LinearGradient>
-      </SafeAreaView>
-    );
+        </ScrollView>
+      </LinearGradient>
+    </SafeAreaView>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -182,12 +181,54 @@ const styles = StyleSheet.create({
   cardioHeading: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#00BCD4',
+    color: '#6b8d6cff',
     textAlign: 'center',
     marginBottom: 24,
     marginTop: 8,
     letterSpacing: 1,
   },
+  
+  // Personalized Health Box
+  personalizedContainer: {
+    backgroundColor: 'transparent',
+    padding: 16,
+    marginBottom: 24,
+  },
+  personalizedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  personalizedTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  personalizedText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  personalizedStats: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 188, 212, 0.1)',
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  statBadgeText: {
+    fontSize: 12,
+    color: '#00BCD4',
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+
   quoteContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 10,
@@ -207,96 +248,71 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 12,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 32,
-  },
-  statCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 12,
-    padding: 16,
+
+  // Inspiring Image
+  imagePlaceholder: {
+    backgroundColor: 'transparent',
+    padding: 32,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 24,
   },
-  statNumber: {
-    fontSize: 24,
+  imageText: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#00BCD4',
-    marginTop: 4,
+    color: '#374151',
+    marginTop: 12,
+    textAlign: 'center',
   },
-  statLabel: {
-    fontSize: 12,
+  imageSubtext: {
+    fontSize: 14,
     color: '#6B7280',
-    marginTop: 2,
+    marginTop: 4,
+    textAlign: 'center',
   },
+
   buttonContainer: {
     width: '100%',
+    alignItems: 'center',
     gap: 16,
     marginBottom: 32,
   },
   workoutButton: {
-    backgroundColor: '#000',
-    borderRadius: 16,
+    backgroundColor: 'transparent',
+    borderRadius: 50,
+    borderColor: '#6b8d6cff',
+    borderWidth: 4,
     paddingVertical: 18,
     flexDirection: 'row',
+    width: 350,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
   },
   workoutButtonText: {
-    color: '#fff',
+    color: '#6b8d6cff',
     fontWeight: 'bold',
     fontSize: 18,
     letterSpacing: 0.5,
   },
   historyButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 16,
+   backgroundColor: 'transparent',
+    borderRadius: 50,
+    borderColor: '#6b8d6cff',
+    borderWidth: 4,
     paddingVertical: 18,
     flexDirection: 'row',
+    width: 350,
+    height: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#00BCD4',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
   },
   historyButtonText: {
-    color: '#00BCD4',
+    color: '#6b8d6cff',
     fontWeight: 'bold',
     fontSize: 18,
     letterSpacing: 0.5,
   },
-  tipsContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 10,
-    padding: 12,
-  },
-  tipsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  tipItem: {
-    marginBottom: 8,
-  },
-  tipText: {
-    fontSize: 16,
-    color: '#6B7280',
-    lineHeight: 22,
-  },
+
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -375,4 +391,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default WorkoutHome; 
+export default WorkoutHome;
