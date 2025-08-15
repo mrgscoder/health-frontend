@@ -3,7 +3,6 @@ import './globals.css'
 import { useEffect, useRef } from 'react';
 import { registerForPushNotificationsAsync } from './usePushNotifications';
 import * as Notifications from 'expo-notifications';
-import { Audio } from 'expo-av';
 import BASE_URL from "../src/config";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -16,12 +15,14 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true, // Play sound for alarm effect
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
 export default function RootLayout() {
-  const notificationListener = useRef();
-  const responseListener = useRef();
+  const notificationListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -46,8 +47,12 @@ export default function RootLayout() {
     });
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationListener.current);
-      Notifications.removeNotificationSubscription(responseListener.current);
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
     };
   }, []);
 

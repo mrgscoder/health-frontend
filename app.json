@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.HealthSync",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMotionUsageDescription": "This app uses motion data to count your steps."
       }
     },
     "android": {
@@ -23,7 +24,10 @@
       "edgeToEdgeEnabled": true,
       "package": "com.anonymous.HealthSync",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.BODY_SENSORS",
+        "com.google.android.gms.permission.ACTIVITY_RECOGNITION"
       ]
     },
     "web": {
@@ -55,6 +59,12 @@
         {
           "photosPermission": "The app accesses your photos to let you share them with your friends.",
           "cameraPermission": "The app accesses your camera to let you take photos."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow $(PRODUCT_NAME) to access your device motion to count steps."
         }
       ]
     ],

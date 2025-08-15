@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, Dimensions, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Alert, Dimensions, Image, Platform } from 'react-native';
 import { User, Target, Plus, TrendingUp, Calendar, Edit, MoreVertical, Flame, Bell, ArrowRight, Activity, Moon, Droplets, Utensils, Dumbbell, Scale, Heart, Thermometer, Wind, Zap, Brain, Pill, Timer, Apple, BarChart3 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import BASE_URL from '../../../src/config';
 import { clearAuthData } from '../../utils/authUtils';
 import { PanGestureHandler, NativeViewGestureHandler, PanGestureHandlerGestureEvent, State } from 'react-native-gesture-handler';
@@ -35,6 +36,8 @@ const HealthTrackerDashboard = () => {
   const router = useRouter();
   const [currentDate] = useState(new Date());
   const [selectedItems, setSelectedItems] = useState(new Set<string>());
+  const [showReminder, setShowReminder] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
   const [goals] = useState({
     calories: { current: 1450, target: 1550 },
     water: { current: 6, target: 8 },
@@ -53,6 +56,7 @@ const HealthTrackerDashboard = () => {
   const [userGender, setUserGender] = useState<string | null>(null);
   const [statOrder, setStatOrder] = useState<Stat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [reminderKey, setReminderKey] = useState('hasSeenCardReorderReminder');
 
   // Default stat configuration
   const defaultStats: Stat[] = [
@@ -253,7 +257,30 @@ const HealthTrackerDashboard = () => {
       }
     };
     
-    fetchUserProfile();
+    fetchUserProfile().then(async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) return;
+        // Fetch profile again to ensure we have the user id for namespacing the reminder
+        const response = await fetch(`${BASE_URL}/api/auth/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        const data = await response.json();
+        const userId = data?.user?.user_id || data?.user?.id;
+        if (userId) {
+          const key = `hasSeenCardReorderReminder:${userId}`;
+          setReminderKey(key);
+          const hasSeenReminder = await AsyncStorage.getItem(key);
+          if (!hasSeenReminder) {
+            console.log('🆕 First login for this user, will show reminder shortly');
+            setIsNewUser(true);
+            setTimeout(() => setShowReminder(true), 1500);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error determining reminder visibility:', error);
+      }
+    });
     loadCardSequence();
   }, []);
 
@@ -275,6 +302,17 @@ const HealthTrackerDashboard = () => {
 
   const getProgressColor = (percentage: number) => {
     return '#11B5CF';
+  };
+
+  const handleGotItClick = async () => {
+    try {
+      await AsyncStorage.setItem(reminderKey, 'true');
+      setShowReminder(false);
+      console.log('✅ Reminder dismissed and saved');
+    } catch (error) {
+      console.error('❌ Error saving reminder status:', error);
+      setShowReminder(false);
+    }
   };
 
   const handleItemSelect = (itemId: string) => {
@@ -668,6 +706,44 @@ const HealthTrackerDashboard = () => {
           </ScrollView>
         </NativeViewGestureHandler>
       </LinearGradient>
+
+      {/* Card Reorder Reminder Overlay */}
+      {showReminder && (
+        <BlurView
+          intensity={60}
+          tint="dark"
+          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 9999, elevation: 9999, backgroundColor: 'rgba(0,0,0,0.15)' }}
+        >
+          <View className="bg-white rounded-3xl p-6 mx-6 max-w-sm w-full shadow-2xl">
+            <View className="items-center mb-4">
+              <View className="w-16 h-16 rounded-full items-center justify-center mb-4">
+                <Image
+                  source={require('../../../assets/icons/gesture.png')}
+                  style={{ width: 40, height: 40 }}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text className="text-xl font-bold text-gray-800 text-center mb-2">
+                Try Reordering Your Cards
+              </Text>
+              <Text className="text-gray-600 text-center text-base leading-6">
+                Long press and drag any card to reorder your dashboard
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleGotItClick}
+              className="py-4 px-6 rounded-2xl items-center"
+              style={{ backgroundColor: '#11B5CF', width: '50%', alignSelf: 'center' }}
+              activeOpacity={0.8}
+            >
+              <Text className="text-white font-semibold text-lg">
+                Got it!
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      )}
     </SafeAreaView>
   );
 };

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, Alert, ScrollView, PermissionsAndroid, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { Pedometer } from 'expo-sensors';
+import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BASE_URL from '../../src/config';
 
@@ -12,16 +13,28 @@ const StepCounter = () => {
   const insets = useSafeAreaInsets();
   const [currentDay, setCurrentDay] = useState(new Date().getDay());
   const [stepCount, setStepCount] = useState(0);
-  const [isPedometerAvailable, setIsPedometerAvailable] = useState<boolean | null>(null);
-  const [pedometerError, setPedometerError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isAccelerometerActive, setIsAccelerometerActive] = useState(false);
+  const [detectionMethod, setDetectionMethod] = useState<string>('none');
   const [weeklyData, setWeeklyData] = useState<Record<string, any>>({});
+
+  // Accelerometer-based step detection
+  const accelerometerData = useRef({ x: 0, y: 0, z: 0 });
+  const lastStepTime = useRef(0);
+  const stepThreshold = 2.5; // Increased threshold to filter out small movements
+  const minStepInterval = 400; // Increased minimum time between steps for more realistic walking
+  const stepBuffer = useRef<number[]>([]);
+  const bufferSize = 5; // Number of readings to average
+
+
 
   // Load weekly data from backend
   const loadWeeklyData = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        console.log('No token found, skipping backend data load');
+        return;
+      }
 
       const response = await fetch(`${BASE_URL}/api/step/get`, {
         headers: {
@@ -37,6 +50,8 @@ const StepCounter = () => {
           weeklyDataMap[item.day] = item;
         });
         setWeeklyData(weeklyDataMap);
+      } else {
+        console.log('Failed to load weekly data:', response.status);
       }
     } catch (error) {
       console.error('Error loading weekly data:', error);
@@ -47,7 +62,10 @@ const StepCounter = () => {
   const saveStepData = async (day: string, data: any) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        console.log('No token found, skipping backend save');
+        return;
+      }
 
       const response = await fetch(`${BASE_URL}/api/step/send`, {
         method: 'POST',
@@ -67,19 +85,158 @@ const StepCounter = () => {
 
       if (response.ok) {
         console.log('Step data saved successfully');
-        // Reload weekly data after saving
         await loadWeeklyData();
       } else {
-        console.error('Failed to save step data');
+        console.error('Failed to save step data:', response.status);
       }
     } catch (error) {
       console.error('Error saving step data:', error);
     }
   };
 
+  // Load stored step count from AsyncStorage
+  const loadStoredStepCount = async () => {
+    try {
+      const today = new Date().toDateString();
+      const storedData = await AsyncStorage.getItem(`steps_${today}`);
+      if (storedData) {
+        const parsedData = JSON.parse(storedData);
+        setStepCount(parsedData.steps || 0);
+      }
+    } catch (error) {
+      console.error('Error loading stored step count:', error);
+    }
+  };
+
+  // Save step count to AsyncStorage
+  const saveStepCount = async (steps: number) => {
+    try {
+      const today = new Date().toDateString();
+      const data = { steps, timestamp: Date.now() };
+      await AsyncStorage.setItem(`steps_${today}`, JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving step count:', error);
+    }
+  };
+
+  // Accelerometer-based step detection algorithm
+  const detectStepFromAccelerometer = (x: number, y: number, z: number) => {
+    const magnitude = Math.sqrt(x * x + y * y + z * z);
+    const prevMagnitude = Math.sqrt(
+      accelerometerData.current.x * accelerometerData.current.x +
+      accelerometerData.current.y * accelerometerData.current.y +
+      accelerometerData.current.z * accelerometerData.current.z
+    );
+
+    accelerometerData.current = { x, y, z };
+
+    const difference = Math.abs(magnitude - prevMagnitude);
+    const currentTime = Date.now();
+
+    // Add to buffer for averaging
+    stepBuffer.current.push(difference);
+    if (stepBuffer.current.length > bufferSize) {
+      stepBuffer.current.shift();
+    }
+
+    // Calculate average difference over the buffer
+    const avgDifference = stepBuffer.current.reduce((sum, val) => sum + val, 0) / stepBuffer.current.length;
+
+    // Check for step pattern: significant movement followed by stabilization
+    const isSignificantMovement = avgDifference > stepThreshold;
+    const hasStabilized = stepBuffer.current.length >= bufferSize && 
+                         Math.max(...stepBuffer.current.slice(-3)) < stepThreshold * 0.3;
+    const timeSinceLastStep = currentTime - lastStepTime.current;
+
+    // Only log significant movements
+    if (avgDifference > stepThreshold * 0.7) {
+      console.log('Movement analysis:', { 
+        avgDifference: avgDifference.toFixed(2), 
+        threshold: stepThreshold,
+        hasStabilized,
+        timeSinceLastStep
+      });
+    }
+
+    // Step detection criteria:
+    // 1. Significant movement detected
+    // 2. Movement has stabilized (indicating step completion)
+    // 3. Enough time has passed since last step
+    if (
+      isSignificantMovement &&
+      hasStabilized &&
+      timeSinceLastStep > minStepInterval
+    ) {
+      lastStepTime.current = currentTime;
+      console.log('Step detected! Avg difference:', avgDifference.toFixed(2));
+      
+      // Clear buffer after step detection
+      stepBuffer.current = [];
+      
+      return true;
+    }
+    return false;
+  };
+
+  // Initialize step counting systems
+  const initializeStepCounting = async () => {
+    try {
+      // Load stored step count first
+      await loadStoredStepCount();
+      await loadWeeklyData();
+
+      // Automatically use accelerometer for step counting (most reliable method)
+      console.log('Setting up accelerometer for step counting...');
+      setDetectionMethod('accelerometer');
+      setIsAccelerometerActive(true);
+      
+      Accelerometer.setUpdateInterval(100);
+      console.log('Accelerometer update interval set to 100ms');
+      
+      const subscription = Accelerometer.addListener(({ x, y, z }) => {
+        if (detectStepFromAccelerometer(x, y, z)) {
+          setStepCount(prev => {
+            const newCount = prev + 1;
+            saveStepCount(newCount);
+            console.log('Accelerometer detected step:', newCount);
+            return newCount;
+          });
+        }
+      });
+
+      console.log('Accelerometer listener added successfully');
+      return () => subscription?.remove();
+    } catch (error) {
+      console.error("Step counting initialization error:", error);
+      setDetectionMethod('manual');
+    }
+  };
+
+
+
+
+
+  // Reset daily step count
+  const resetStepCount = () => {
+    Alert.alert(
+      "Reset Step Count",
+      "Are you sure you want to reset today's step count?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Reset", 
+          onPress: () => {
+            setStepCount(0);
+            saveStepCount(0);
+          }
+        }
+      ]
+    );
+  };
+
   // Auto-save step data when it changes
   useEffect(() => {
-    if (stepCount > 0 && isPedometerAvailable) {
+    if (stepCount > 0) {
       const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
       const currentData = {
         steps: stepCount,
@@ -89,75 +246,48 @@ const StepCounter = () => {
         floors: Math.floor(stepCount / 1500),
       };
       
-      // Debounce the save to avoid too many API calls
       const timeoutId = setTimeout(() => {
         saveStepData(today, currentData);
-      }, 2000); // Save after 2 seconds of no changes
+      }, 2000);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [stepCount, isPedometerAvailable]);
+  }, [stepCount]);
 
   useEffect(() => {
-    let subscription: any;
+    let cleanup: (() => void) | undefined;
 
-    const setupPedometer = async () => {
-      try {
-        // Load existing data first
-        await loadWeeklyData();
-
-        // Check if pedometer is available
-        const isAvailable = await Pedometer.isAvailableAsync();
-        setIsPedometerAvailable(isAvailable);
-        
-        if (isAvailable) {
-          // Start watching step count
-          subscription = Pedometer.watchStepCount(result => {
-            console.log('Step count updated:', result.steps);
-            setStepCount(result.steps);
-          });
-          
-          // Also get the current step count
-          try {
-            const currentSteps = await Pedometer.getStepCountAsync(new Date(), new Date());
-            setStepCount(currentSteps.steps);
-          } catch (error) {
-            console.log('Could not get current step count:', error);
-          }
-        } else {
-          setPedometerError("Pedometer not available on this device");
-        }
-      } catch (error) {
-        console.error("Pedometer setup error:", error);
-        setPedometerError("Failed to initialize pedometer");
-        setIsPedometerAvailable(false);
-      }
+    const setup = async () => {
+      cleanup = await initializeStepCounting();
     };
 
-    setupPedometer();
+    setup();
 
     return () => {
-      if (subscription) {
-        subscription.remove();
+      cleanup?.();
+      // Clean up accelerometer listeners properly
+      if (isAccelerometerActive) {
+        try {
+          Accelerometer.removeAllListeners();
+        } catch (error) {
+          console.log('Error removing accelerometer listeners:', error);
+        }
       }
     };
   }, []);
 
   const goalSteps = 10000;
   
-  // Get current day name
   const getCurrentDayName = (dayIndex: number) => {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return dayNames[dayIndex];
   };
 
-  // Get data for current day - use backend data if available, otherwise real-time data
   const getCurrentDayData = () => {
     const today = getCurrentDayName(currentDay);
     const backendData = weeklyData[today];
     
-    if (currentDay === new Date().getDay() && isPedometerAvailable) {
-      // Today with pedometer - use real step count
+    if (currentDay === new Date().getDay()) {
       const currentSteps = stepCount;
       return {
         steps: currentSteps,
@@ -167,7 +297,6 @@ const StepCounter = () => {
         floors: Math.floor(currentSteps / 1500),
       };
     } else if (backendData) {
-      // Use backend data if available
       return {
         steps: backendData.steps || 0,
         miles: backendData.miles || 0,
@@ -176,7 +305,6 @@ const StepCounter = () => {
         floors: backendData.floors || 0,
       };
     } else {
-      // No data available - return zeros
       return {
         steps: 0,
         miles: 0,
@@ -202,17 +330,15 @@ const StepCounter = () => {
 
   const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-
-
   const getDayCircleColors = (dayIndex: number): string[] | null => {
     const gradients = [
-      ['#dffd6e', '#14b8a6'], // Sunday
-      ['#fbbf24', '#f59e42'], // Monday
-      ['#f472b6', '#a78bfa'], // Tuesday
-      ['#60a5fa', '#2563eb'], // Wednesday
-      ['#f87171', '#fbbf24'], // Thursday
-      ['#34d399', '#10b981'], // Friday
-      ['#a3e635', '#f472b6'], // Saturday
+      ['#dffd6e', '#14b8a6'],
+      ['#fbbf24', '#f59e42'],
+      ['#f472b6', '#a78bfa'],
+      ['#60a5fa', '#2563eb'],
+      ['#f87171', '#fbbf24'],
+      ['#34d399', '#10b981'],
+      ['#a3e635', '#f472b6'],
     ];
     return gradients[dayIndex % 7];
   };
@@ -269,15 +395,17 @@ const StepCounter = () => {
     );
   };
 
-  return (
-    <View className="flex-1" style={{ backgroundColor: '#73C8A9' }}>
-      <View className="flex-1" style={{ paddingTop: insets.top }}>
-        {/* Header */}
-        <View className="px-6 py-4">
+
+
+      return (
+      <View className="flex-1" style={{ backgroundColor: '#d6f3a0' }}>
+                <View className="flex-1" style={{ paddingTop: insets.top }}>
+          {/* Header */}
+          <View className="px-6 py-4 mt-4">
           <Text className="text-3xl font-bold text-lightblue text-center mb-2">
             Step Counter
           </Text>
-          <Text className="text-lightblue/80 text-center text-sm">
+          <Text className="text-lightblue/80 text-center text-sm mb-6">
             Track your daily activity and stay motivated
           </Text>
         </View>
@@ -290,9 +418,9 @@ const StepCounter = () => {
           </View>
 
           {/* Current Day Stats */}
-          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
-            <Text className="text-xl font-semibold text-lightblue mb-4 text-center">
-              Today's Progress
+          <View className="rounded-2xl p-6 mb-6" style={{ backgroundColor: '#e8ffb3' }}>
+            <Text className="text-xl font-semibold text-blue-600 mb-4 text-center">
+              {currentDay === new Date().getDay() ? "Today's Progress" : `${getCurrentDayName(currentDay)}'s Progress`}
             </Text>
             <View className="flex-row justify-between">
               <View className="items-center">
@@ -314,8 +442,10 @@ const StepCounter = () => {
             </View>
           </View>
 
+
+
           {/* Weekly Overview */}
-          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
+          <View className="rounded-2xl p-6 mb-8" style={{ backgroundColor: '#e8ffb3' }}>
             <Text className="text-xl font-semibold text-lightblue mb-4 text-center">
               Weekly Overview
             </Text>
@@ -336,7 +466,7 @@ const StepCounter = () => {
               onPress={() => navigateDay('prev')}
               className="bg-white/20 backdrop-blur-sm rounded-full p-3"
             >
-              <Ionicons name="chevron-back" size={24} color="white" />
+              <Ionicons name="chevron-back" size={24} color="black" />
             </TouchableOpacity>
             <Text className="text-lg font-semibold text-lightblue">
               {getCurrentDayName(currentDay)}
@@ -345,37 +475,15 @@ const StepCounter = () => {
               onPress={() => navigateDay('next')}
               className="bg-white/20 backdrop-blur-sm rounded-full p-3"
             >
-              <Ionicons name="chevron-forward" size={24} color="white" />
+              <Ionicons name="chevron-forward" size={24} color="black" />
             </TouchableOpacity>
           </View>
 
-          {/* Status */}
-          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-6">
-            <Text className="text-lg font-semibold text-lightblue mb-3 text-center">
-              Pedometer Status
-            </Text>
-            {isPedometerAvailable === null ? (
-              <Text className="text-lightblue/80 text-center">Checking availability...</Text>
-            ) : isPedometerAvailable ? (
-              <View className="items-center">
-                <Ionicons name="checkmark-circle" size={48} color="#4ade80" />
-                <Text className="text-lightblue/80 text-center mt-2">
-                  Pedometer is available and tracking steps
-                </Text>
-              </View>
-            ) : (
-              <View className="items-center">
-                <Ionicons name="close-circle" size={48} color="#ef4444" />
-                <Text className="text-lightblue/80 text-center mt-2">
-                  {pedometerError || 'Pedometer is not available on this device'}
-                </Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
+
+                  </ScrollView>
+        </View>
       </View>
-    </View>
-  );
+    );
 };
 
 export default StepCounter;
