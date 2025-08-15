@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { EXERCISES } from './Cardio';
+import React, { useEffect, useRef, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BASE_URL from "../../src/config";
+import { EXERCISES } from './Cardio';
 
 const EXERCISE_DURATION = 30; // seconds
 const REST_DURATION = 5; // seconds
@@ -52,9 +52,10 @@ const ExerciseTimer = () => {
 
   useEffect(() => {
     if (running) {
-      intervalRef.current = setInterval(() => setTimer(prev => prev - 1), 1000);
+      intervalRef.current = setInterval(() => setTimer(prev => prev - 1), 1000) as unknown as NodeJS.Timeout;
     } else if (intervalRef.current) {
       clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -106,13 +107,13 @@ const ExerciseTimer = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#0cb6ab', marginBottom: 8 },
+  container: { flex: 1, backgroundColor: '#c8e6c9', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#6b8d6cff', marginBottom: 8 },
   sets: { fontSize: 18, color: '#555', marginBottom: 8 },
-  timer: { fontSize: 64, fontWeight: 'bold', color: '#0cb6ab', marginBottom: 8 },
+  timer: { fontSize: 64, fontWeight: 'bold', color: '#6b8d6cff', marginBottom: 8 },
   rest: { fontSize: 20, color: '#888', marginBottom: 16 },
-  button: { backgroundColor: '#0cb6ab', padding: 16, borderRadius: 12, marginTop: 16 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
+  button: { backgroundColor: 'transparent', padding: 16, borderRadius: 50, marginTop: 16, borderWidth: 3, borderColor: '#6b8d6cff' },
+  buttonText: { color: '#6b8d6cff', fontWeight: 'bold', fontSize: 18 },
 });
 
 export default ExerciseTimer;
