@@ -20,10 +20,8 @@ const StepCounter = () => {
   // Accelerometer-based step detection
   const accelerometerData = useRef({ x: 0, y: 0, z: 0 });
   const lastStepTime = useRef(0);
-  const stepThreshold = 2.5; // Increased threshold to filter out small movements
-  const minStepInterval = 400; // Increased minimum time between steps for more realistic walking
-  const stepBuffer = useRef<number[]>([]);
-  const bufferSize = 5; // Number of readings to average
+  const stepThreshold = 0.8; // Lowered threshold for better sensitivity
+  const minStepInterval = 200; // Reduced minimum time between steps
 
 
 
@@ -133,46 +131,17 @@ const StepCounter = () => {
     const difference = Math.abs(magnitude - prevMagnitude);
     const currentTime = Date.now();
 
-    // Add to buffer for averaging
-    stepBuffer.current.push(difference);
-    if (stepBuffer.current.length > bufferSize) {
-      stepBuffer.current.shift();
+    // Only log when difference is significant to avoid spam
+    if (difference > stepThreshold * 0.5) {
+      console.log('Significant movement detected:', { difference, threshold: stepThreshold });
     }
 
-    // Calculate average difference over the buffer
-    const avgDifference = stepBuffer.current.reduce((sum, val) => sum + val, 0) / stepBuffer.current.length;
-
-    // Check for step pattern: significant movement followed by stabilization
-    const isSignificantMovement = avgDifference > stepThreshold;
-    const hasStabilized = stepBuffer.current.length >= bufferSize && 
-                         Math.max(...stepBuffer.current.slice(-3)) < stepThreshold * 0.3;
-    const timeSinceLastStep = currentTime - lastStepTime.current;
-
-    // Only log significant movements
-    if (avgDifference > stepThreshold * 0.7) {
-      console.log('Movement analysis:', { 
-        avgDifference: avgDifference.toFixed(2), 
-        threshold: stepThreshold,
-        hasStabilized,
-        timeSinceLastStep
-      });
-    }
-
-    // Step detection criteria:
-    // 1. Significant movement detected
-    // 2. Movement has stabilized (indicating step completion)
-    // 3. Enough time has passed since last step
     if (
-      isSignificantMovement &&
-      hasStabilized &&
-      timeSinceLastStep > minStepInterval
+      difference > stepThreshold &&
+      currentTime - lastStepTime.current > minStepInterval
     ) {
       lastStepTime.current = currentTime;
-      console.log('Step detected! Avg difference:', avgDifference.toFixed(2));
-      
-      // Clear buffer after step detection
-      stepBuffer.current = [];
-      
+      console.log('Step detected! Difference:', difference);
       return true;
     }
     return false;
@@ -190,8 +159,8 @@ const StepCounter = () => {
       setDetectionMethod('accelerometer');
       setIsAccelerometerActive(true);
       
-      Accelerometer.setUpdateInterval(100);
-      console.log('Accelerometer update interval set to 100ms');
+      Accelerometer.setUpdateInterval(50);
+      console.log('Accelerometer update interval set to 50ms');
       
       const subscription = Accelerometer.addListener(({ x, y, z }) => {
         if (detectStepFromAccelerometer(x, y, z)) {

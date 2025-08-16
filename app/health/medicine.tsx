@@ -13,6 +13,7 @@ import {
   Vibration,
   Switch,
   AppState,
+  StyleSheet,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,9 +23,9 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import * as Notifications from 'expo-notifications';
-import { 
-  addMedicine as addMedicineAPI, 
-  getAllMedicines as getAllMedicinesAPI, 
+import {
+  addMedicine as addMedicineAPI,
+  getAllMedicines as getAllMedicinesAPI,
   getTodayMedicines as getTodayMedicinesAPI,
   markMedicineTaken as markMedicineTakenAPI,
   deleteMedicine as deleteMedicineAPI,
@@ -77,7 +78,7 @@ const MedicineTracker: React.FC = () => {
   // Date picker states
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  
+
   // Dosage dropdown state
   const [showDosageDropdown, setShowDosageDropdown] = useState(false);
 
@@ -122,30 +123,31 @@ const MedicineTracker: React.FC = () => {
 
     try {
       setIsSchedulingAlarms(true);
-      console.log('🔔 Auto-scheduling alarms for today...');
-      
-      // Get existing medicine notifications
+      console.log('🔔 Starting alarm scheduling for today...');
+
+      // Get existing notifications
       const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
-      const existingMedicineNotifications = allNotifications.filter(notification => 
+      const existingMedicineNotifications = allNotifications.filter(notification =>
         notification.content.data?.type === 'medicine'
       );
 
-      const now = new Date();
+      // Create a set to track scheduled dose keys
+      const scheduledDoses = new Map<string, boolean>();
       let scheduledCount = 0;
       let cancelledCount = 0;
       let skippedCount = 0;
 
-      // Create a map to track unique medicine-time combinations
-      const scheduledDoses = new Map<string, boolean>();
-
-      // First, cancel ALL existing medicine notifications to ensure no duplicates
-      console.log(`🗑️ Cancelling ${existingMedicineNotifications.length} existing medicine notifications...`);
+      // Cancel all existing medicine notifications to prevent duplicates
+      console.log(`🗑️ Cancelling ${existingMedicineNotifications.length} existing notifications...`);
       for (const notification of existingMedicineNotifications) {
         await Notifications.cancelScheduledNotificationAsync(notification.identifier);
         cancelledCount++;
       }
 
-      // Then schedule exactly one alarm per medicine dose
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+
+      // Schedule notifications for each dose
       for (const dose of todaySchedule) {
         // Skip if already taken
         if (dose.taken === true) {
@@ -154,59 +156,43 @@ const MedicineTracker: React.FC = () => {
           continue;
         }
 
-        // Create unique key for this medicine-time combination
-        const doseKey = `${dose.medicineId}-${dose.time}`;
-        
-        // Skip if we've already scheduled this exact dose
+        // Create unique dose key
+        const doseKey = `${dose.medicineId}-${dose.time}-${today}`;
         if (scheduledDoses.has(doseKey)) {
           console.log(`⏭️ Skipping duplicate: ${dose.medicineName} at ${dose.time}`);
           skippedCount++;
           continue;
         }
 
-        // Mark this dose as scheduled
-        scheduledDoses.set(doseKey, true);
-
-        // Parse the time and create proper schedule date
+        // Parse time and create schedule date
         const [hour, minute] = dose.time.split(':').map(Number);
-        
-        // Create schedule date for today
         const scheduleDate = new Date();
         scheduleDate.setHours(hour, minute, 0, 0);
-        
-        // Calculate milliseconds until alarm
+
+        // Ensure the date is today to avoid scheduling for future/past days
+        scheduleDate.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+
         const millisecondsUntilAlarm = scheduleDate.getTime() - now.getTime();
         const secondsUntilAlarm = Math.floor(millisecondsUntilAlarm / 1000);
 
-        // If the time has already passed today, DISCARD it (don't schedule for tomorrow)
-        if (secondsUntilAlarm <= 0) {
-          console.log(`⏰ ${dose.medicineName} time already passed today at ${scheduleDate.toLocaleTimeString()} - DISCARDING (missed dose)`);
+        // Skip if the time has passed or is too soon (within 30 seconds)
+        if (secondsUntilAlarm <= 30) {
+          console.log(`⏰ ${dose.medicineName} at ${dose.time} is in the past or too soon (${secondsUntilAlarm}s) - skipping`);
           skippedCount++;
-          continue; // Skip this dose entirely - it's missed
+          continue;
         }
 
-        // Only schedule for today if the time is still in the future
-        console.log(`⏰ ${dose.medicineName} scheduling for today at ${scheduleDate.toLocaleString()}`);
-        console.log(`⏰ Will trigger in ${secondsUntilAlarm} seconds (${Math.floor(secondsUntilAlarm/60)} minutes)`);
-
-        // Don't schedule if it's more than 24 hours away (shouldn't happen with our logic)
+        // Skip if the time is more than 24 hours away
         if (secondsUntilAlarm > 86400) {
           console.log(`⚠️ Skipping ${dose.medicineName} - too far in future (${secondsUntilAlarm}s)`);
           skippedCount++;
           continue;
         }
 
-        // Don't schedule if it would trigger too soon (within 30 seconds) to prevent immediate ringing
-        if (secondsUntilAlarm < 30) {
-          console.log(`⚠️ Skipping ${dose.medicineName} - would trigger too soon (${secondsUntilAlarm}s)`);
-          skippedCount++;
-          continue;
-        }
-
-        // Schedule exactly ONE notification for this dose
+        // Schedule the notification
         const notificationId = await Notifications.scheduleNotificationAsync({
           content: {
-            title: '💊 MEDICINE TIME!',
+            title: 'MEDICINE TIME!',
             body: `Time to take ${dose.medicineName} - ${dose.dosage}`,
             data: {
               type: 'medicine',
@@ -214,35 +200,31 @@ const MedicineTracker: React.FC = () => {
               time: dose.time,
               medicineName: dose.medicineName,
               dosage: dose.dosage,
-              doseKey: doseKey, // Add unique identifier
+              doseKey: doseKey,
             },
             sound: 'default',
             priority: 'high',
           },
           trigger: {
-            seconds: Math.max(1, secondsUntilAlarm),
-          } as any,
+            type: 'timeInterval',
+            seconds: Math.floor((scheduleDate.getTime() - Date.now()) / 1000),
+          },
         });
 
+        scheduledDoses.set(doseKey, true);
         scheduledCount++;
-        const scheduleTime = scheduleDate.toLocaleTimeString();
-        console.log(`✅ Scheduled UNIQUE alarm: ${dose.medicineName} at ${scheduleTime} (ID: ${notificationId}, Key: ${doseKey})`);
-        console.log(`⏰ Will trigger in ${secondsUntilAlarm} seconds (${Math.floor(secondsUntilAlarm/60)} minutes)`);
+        console.log(`✅ Scheduled alarm: ${dose.medicineName} at ${scheduleDate.toLocaleTimeString()} (ID: ${notificationId}, Key: ${doseKey})`);
       }
 
-      console.log(`🎯 Auto-scheduling complete: ${scheduledCount} new alarms, ${cancelledCount} cancelled, ${skippedCount} skipped`);
-      
-      // Save alarm state
+      console.log(`🎯 Scheduling complete: ${scheduledCount} new alarms, ${cancelledCount} cancelled, ${skippedCount} skipped`);
+
+      // Save last schedule timestamp
       await AsyncStorage.setItem('lastAutoSchedule', now.toISOString());
-      
-      // Add a small delay before re-enabling the notification listener
-      setTimeout(() => {
-        setIsSchedulingAlarms(false);
-        console.log('✅ Alarm scheduling complete, notification listener re-enabled');
-      }, 2000); // 2 second delay
-      
+
     } catch (error) {
-      console.error('❌ Error auto-scheduling alarms:', error);
+      console.error('❌ Error scheduling alarms:', error);
+      Alert.alert('Error', 'Failed to schedule alarms. Please try again.');
+    } finally {
       setIsSchedulingAlarms(false);
     }
   }, [medicineAlarmsEnabled, todaySchedule]);
@@ -251,9 +233,7 @@ const MedicineTracker: React.FC = () => {
   useEffect(() => {
     const requestPermissions = async () => {
       try {
-        // Check current permission status first
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        
         if (existingStatus !== 'granted') {
           console.log('🔔 Requesting notification permissions...');
           const { status } = await Notifications.requestPermissionsAsync({
@@ -268,20 +248,17 @@ const MedicineTracker: React.FC = () => {
               allowSound: true,
             },
           });
-          
+
           if (status !== 'granted') {
             console.log('❌ Notification permissions denied');
             Alert.alert(
               'Notification Permissions Required',
-              'Please enable notifications in your device settings to receive medicine reminders. Go to Settings > Apps > HealthSync > Notifications.',
+              'Please enable notifications in your device settings to receive medicine reminders.',
               [
                 { text: 'OK' },
-                { 
-                  text: 'Open Settings', 
-                  onPress: () => {
-                    // This would ideally open device settings, but we'll just show an alert
-                    Alert.alert('Settings', 'Please manually enable notifications for this app in your device settings.');
-                  }
+                {
+                  text: 'Open Settings',
+                  onPress: () => Alert.alert('Settings', 'Please manually enable notifications.')
                 }
               ]
             );
@@ -295,99 +272,75 @@ const MedicineTracker: React.FC = () => {
         console.error('Error requesting notification permissions:', error);
       }
     };
-
     requestPermissions();
   }, []);
 
-  // Auto-schedule alarms when data changes - but only once per day
+  // Auto-schedule alarms when data changes
   useEffect(() => {
     const checkAndScheduleAlarms = async () => {
       if (todaySchedule.length === 0) return;
-      
+
       try {
-        // Check if we've already scheduled alarms today
         const lastSchedule = await AsyncStorage.getItem('lastAutoSchedule');
         const today = new Date().toISOString().split('T')[0];
-        
-        // Allow re-scheduling if:
-        // 1. We haven't scheduled today, OR
-        // 2. The app was just started (check if we have any existing notifications)
+
         const existingNotifications = await Notifications.getAllScheduledNotificationsAsync();
-        const existingMedicineNotifications = existingNotifications.filter(notification => 
+        const existingMedicineNotifications = existingNotifications.filter(notification =>
           notification.content.data?.type === 'medicine'
         );
-        
-        const shouldReschedule = !lastSchedule || 
-          !lastSchedule.startsWith(today) || 
+
+        const shouldReschedule = !lastSchedule ||
+          !lastSchedule.startsWith(today) ||
           existingMedicineNotifications.length === 0;
-        
+
         if (!shouldReschedule) {
-          console.log('⏭️ Alarms already scheduled today, skipping auto-schedule');
+          console.log('⏭️ Alarms already scheduled today, skipping');
           return;
         }
-        
-        // Add a longer delay to prevent immediate scheduling when page opens
-        console.log('🔄 Scheduling alarms (first time today or app restart) - delayed by 5 seconds');
+
+        console.log('🔄 Scheduling alarms with delay...');
         setTimeout(() => {
           autoScheduleAlarms();
-        }, 5000); // Increased delay to 5 seconds to give user time to see the interface
+        }, 3000);
       } catch (error) {
         console.error('Error checking last schedule:', error);
       }
     };
-
     checkAndScheduleAlarms();
   }, [autoScheduleAlarms, todaySchedule]);
 
-  // Handle app state changes for re-scheduling - but only if needed
+  // Handle app state changes
   useEffect(() => {
     const handleAppStateChange = (nextAppState: any) => {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
         console.log('📱 App became active');
-        // Only re-schedule if alarms are enabled and we have medicines
-        // But don't auto-schedule every time to prevent spam
         if (medicineAlarmsEnabled && todaySchedule.length > 0) {
-          // Just log that we're active, don't auto-schedule
-          console.log('📱 App active with medicines - alarms should be working');
+          console.log('📱 Checking alarm status...');
+          autoScheduleAlarms();
         }
       }
       setAppState(nextAppState);
     };
-
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [appState, medicineAlarmsEnabled, todaySchedule]);
+  }, [appState, medicineAlarmsEnabled, todaySchedule, autoScheduleAlarms]);
 
   // Medicine Alarm Handler
   useEffect(() => {
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('🔔 Medicine alarm received:', notification);
-      
-      // Only handle medicine notifications
-      if (notification.request.content.data?.type !== 'medicine') {
-        return;
-      }
-      
-      // Don't show alerts if we're currently scheduling alarms
+      if (notification.request.content.data?.type !== 'medicine') return;
       if (isSchedulingAlarms) {
-        console.log('⚠️ Ignoring notification during alarm scheduling');
+        console.log('⚠️ Ignoring notification during scheduling');
         return;
       }
-      
-      // Get the unique dose key to prevent duplicate processing
-      const doseKey = notification.request.content.data?.doseKey;
-      console.log(`🔔 Processing alarm for dose key: ${doseKey}`);
-      
-      // Trigger local alarm effects
+
       if (medicineAlarmVibration) {
-        // Vibrate pattern: wait 0ms, vibrate 500ms, wait 200ms, vibrate 500ms
-        Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+        Vibration.vibrate([0, 500, 200, 500]);
       }
-      
-      // Show medicine alarm alert
+
       Alert.alert(
         '💊 MEDICINE ALARM!',
-        `Time to take your ${notification.request.content.data?.medicineName}! Stay healthy! 💊`,
+        `Time to take your ${notification.request.content.data?.medicineName}!`,
         [
           {
             text: 'Dismiss',
@@ -398,10 +351,9 @@ const MedicineTracker: React.FC = () => {
             text: 'Mark as Taken',
             onPress: () => {
               Vibration.cancel();
-              // Find the medicine from notification data and mark as taken
               const medicineData = notification.request.content.data;
               if (medicineData && medicineData.medicineId && medicineData.time) {
-                const dose = todaySchedule.find(d => 
+                const dose = todaySchedule.find(d =>
                   d.medicineId === medicineData.medicineId && d.time === medicineData.time
                 );
                 if (dose) {
@@ -416,13 +368,10 @@ const MedicineTracker: React.FC = () => {
     });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('📱 Medicine alarm response:', response);
       Vibration.cancel();
-      
-      // Handle notification tap
       const data = response.notification.request.content.data;
       if (data?.type === 'medicine' && data?.medicineId && data?.time) {
-        const dose = todaySchedule.find(d => 
+        const dose = todaySchedule.find(d =>
           d.medicineId === data.medicineId && d.time === data.time
         );
         if (dose && response.actionIdentifier === 'MARK_TAKEN') {
@@ -438,19 +387,10 @@ const MedicineTracker: React.FC = () => {
     };
   }, [medicineAlarmVibration, todaySchedule, isSchedulingAlarms]);
 
-  // Medicine alarm status logging
-  useEffect(() => {
-    if (!medicineAlarmsEnabled || todaySchedule.length === 0) return;
-
-    console.log('🎯 Medicine alarms enabled for:', todaySchedule.length, 'medicines');
-    console.log('📋 Today\'s schedule:', todaySchedule.map(d => `${d.medicineName} at ${d.time}`));
-  }, [todaySchedule, medicineAlarmsEnabled]);
-
   // Load medicines on component mount
   useEffect(() => {
     const checkAuthAndLoadData = async () => {
       try {
-        // Check if user is authenticated
         const token = await AsyncStorage.getItem('token');
         if (!token) {
           Alert.alert(
@@ -469,69 +409,55 @@ const MedicineTracker: React.FC = () => {
           );
           return;
         }
-
-        // Load data if authenticated
         await loadMedicines();
         await loadTodaySchedule();
       } catch (error) {
         console.error('Error checking authentication:', error);
       }
     };
-
     checkAuthAndLoadData();
   }, []);
 
-  // Load alarm settings from storage and check if we need to reset daily schedule
+  // Load alarm settings
   useEffect(() => {
     const loadAlarmSettings = async () => {
       try {
         const alarmsEnabled = await AsyncStorage.getItem('medicineAlarmsEnabled');
         const vibrationEnabled = await AsyncStorage.getItem('medicineAlarmVibration');
         const lastSchedule = await AsyncStorage.getItem('lastAutoSchedule');
-        
+
         if (alarmsEnabled !== null) {
           setMedicineAlarmsEnabled(JSON.parse(alarmsEnabled));
         }
         if (vibrationEnabled !== null) {
           setMedicineAlarmVibration(JSON.parse(vibrationEnabled));
         }
-        
-        // Check if we need to reset the daily schedule (new day)
+
         if (lastSchedule) {
           const lastScheduleDate = lastSchedule.split('T')[0];
           const today = new Date().toISOString().split('T')[0];
-          
+
           if (lastScheduleDate !== today) {
-            console.log('📅 New day detected - clearing last schedule and cancelling old alarms');
-            await AsyncStorage.removeItem('lastAutoSchedule');
-            
-            // Cancel all existing medicine alarms for the new day
-            try {
-              const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
-              const medicineNotifications = allNotifications.filter(notification => 
-                notification.content.data?.type === 'medicine'
-              );
-              
-              for (const notification of medicineNotifications) {
-                await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-                console.log(`🔕 Cancelled old alarm: ${notification.content.data?.medicineName} at ${notification.content.data?.time}`);
-              }
-              
-              console.log(`🗑️ Cleared ${medicineNotifications.length} old medicine alarms for new day`);
-            } catch (error) {
-              console.error('Error clearing old alarms for new day:', error);
+            console.log('📅 New day detected - clearing old alarms');
+            const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+            const medicineNotifications = allNotifications.filter(notification =>
+              notification.content.data?.type === 'medicine'
+            );
+
+            for (const notification of medicineNotifications) {
+              await Notifications.cancelScheduledNotificationAsync(notification.identifier);
             }
+            await AsyncStorage.removeItem('lastAutoSchedule');
           }
         }
       } catch (error) {
         console.error('Error loading alarm settings:', error);
       }
     };
-
     loadAlarmSettings();
   }, []);
 
-  // Save alarm settings when they change
+  // Save alarm settings
   useEffect(() => {
     const saveAlarmSettings = async () => {
       try {
@@ -541,7 +467,6 @@ const MedicineTracker: React.FC = () => {
         console.error('Error saving alarm settings:', error);
       }
     };
-
     saveAlarmSettings();
   }, [medicineAlarmsEnabled, medicineAlarmVibration]);
 
@@ -578,19 +503,17 @@ const MedicineTracker: React.FC = () => {
 
   // Convert time slot to 24-hour format for storage
   const timeSlotToString = (timeSlot: TimeSlot): string => {
-    // Handle empty values
     if (!timeSlot.hour || !timeSlot.minute) {
-      return '00:00'; // Default fallback
+      return '00:00';
     }
-    
+
     let hour = parseInt(timeSlot.hour);
     if (timeSlot.period === 'PM' && hour !== 12) {
       hour += 12;
     } else if (timeSlot.period === 'AM' && hour === 12) {
       hour = 0;
     }
-    
-    // Pad minute with leading zero if needed for storage
+
     const minute = timeSlot.minute.padStart(2, '0');
     return `${hour.toString().padStart(2, '0')}:${minute}`;
   };
@@ -601,7 +524,7 @@ const MedicineTracker: React.FC = () => {
     const hourNum = parseInt(hour);
     let period: 'AM' | 'PM' = 'AM';
     let displayHour = hourNum;
-    
+
     if (hourNum >= 12) {
       period = 'PM';
       if (hourNum > 12) {
@@ -610,7 +533,7 @@ const MedicineTracker: React.FC = () => {
     } else if (hourNum === 0) {
       displayHour = 12;
     }
-    
+
     return {
       hour: displayHour.toString().padStart(2, '0'),
       minute,
@@ -619,31 +542,27 @@ const MedicineTracker: React.FC = () => {
   };
 
   const addMedicine = async () => {
-    // Check if all required fields are filled
     if (!formData.name) {
       Alert.alert('Error', 'Please enter medicine name');
       return;
     }
-    
+
     if (formData.dosageType === 'Other' && !formData.customDosage) {
       Alert.alert('Error', 'Please enter custom dosage');
       return;
     }
-    
-    // Check if all time slots have valid hour and minute values
+
     const invalidTimes = formData.times.filter(time => !time.hour || !time.minute);
     if (invalidTimes.length > 0) {
-      Alert.alert('Error', 'Please enter valid time for all time slots (hour and minute are required)');
+      Alert.alert('Error', 'Please enter valid time for all time slots');
       return;
     }
 
-    // Check if start date is today
     const today = new Date().toISOString().split('T')[0];
     const isStartingToday = formData.startDate === today;
     console.log('📅 Medicine start date:', formData.startDate, 'Today:', today, 'Is starting today:', isStartingToday);
 
     try {
-      // Check authentication before adding medicine
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         Alert.alert(
@@ -665,7 +584,6 @@ const MedicineTracker: React.FC = () => {
 
       setLoading(true);
       const finalDosage = formData.dosageType === 'Other' ? formData.customDosage : formData.dosageType;
-
       const medicineData = {
         name: formData.name,
         dosage: finalDosage,
@@ -678,7 +596,6 @@ const MedicineTracker: React.FC = () => {
       const result = await addMedicineAPI(medicineData);
       console.log('✅ Medicine added successfully:', result);
 
-      // Reset form
       setFormData({
         name: '',
         dosage: '',
@@ -691,21 +608,15 @@ const MedicineTracker: React.FC = () => {
       });
       setShowAddModal(false);
 
-      // Reload data with a small delay to ensure backend has processed the data
-      console.log('🔄 Reloading medicines and today\'s schedule...');
       await loadMedicines();
-      
-      // Add a small delay before loading today's schedule
       setTimeout(async () => {
         await loadTodaySchedule();
         console.log('✅ Today\'s schedule reloaded after adding medicine');
       }, 500);
 
-      const message = isStartingToday 
+      Alert.alert('Success', isStartingToday
         ? 'Medicine added successfully! It will appear in today\'s schedule. Alarms will be automatically scheduled.'
-        : 'Medicine added successfully! It will appear in the schedule starting from the selected date. Alarms will be automatically scheduled.';
-      
-      Alert.alert('Success', message);
+        : 'Medicine added successfully! It will appear in the schedule starting from the selected date.');
     } catch (error) {
       console.error('Error adding medicine:', error);
       Alert.alert('Error', 'Failed to add medicine. Please try again.');
@@ -724,27 +635,25 @@ const MedicineTracker: React.FC = () => {
   const updateTimeSlot = (index: number, field: keyof TimeSlot, value: string) => {
     const newTimes = [...formData.times];
     let newValue = value;
-    
-    // Validate input based on field
+
     if (field === 'hour') {
       const hourNum = parseInt(value);
       if (value === '' || (hourNum >= 1 && hourNum <= 12)) {
         newValue = value;
       } else {
-        return; // Invalid input, don't update
+        return;
       }
     } else if (field === 'minute') {
       const minuteNum = parseInt(value);
       if (value === '' || (minuteNum >= 0 && minuteNum <= 59)) {
-        // Don't auto-pad, let user enter their own value
         newValue = value;
       } else {
-        return; // Invalid input, don't update
+        return;
       }
     } else {
       newValue = value;
     }
-    
+
     newTimes[index] = { ...newTimes[index], [field]: newValue };
     setFormData({
       ...formData,
@@ -764,13 +673,12 @@ const MedicineTracker: React.FC = () => {
 
   const markMedicineTaken = async (dose: ScheduledDose, taken: boolean) => {
     const medicineKey = `${dose.medicineId}-${dose.time}`;
-    
-    try { 
+
+    try {
       setUpdatingMedicine(medicineKey);
-      
-      // Update local state immediately for instant visual feedback
-      setTodaySchedule(prev => 
-        prev.map(item => 
+
+      setTodaySchedule(prev =>
+        prev.map(item =>
           item.medicineId === dose.medicineId && item.time === dose.time
             ? { ...item, taken }
             : item
@@ -778,8 +686,6 @@ const MedicineTracker: React.FC = () => {
       );
 
       const today = new Date().toISOString().split('T')[0];
-      
-      // Update database
       await markMedicineTakenAPI({
         medicineId: dose.medicineId,
         date: today,
@@ -787,46 +693,30 @@ const MedicineTracker: React.FC = () => {
         taken,
       });
 
-      // Add to completed doses set to hide the buttons
       setCompletedDoses(prev => new Set([...prev, medicineKey]));
 
-      // If medicine was marked as taken, cancel its specific alarm immediately
       if (taken) {
-        try {
-          const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
-          const doseKey = `${dose.medicineId}-${dose.time}`;
-          
-          // Find and cancel the specific alarm for this dose
-          const specificNotification = allNotifications.find(notification => 
-            notification.content.data?.type === 'medicine' &&
-            notification.content.data?.doseKey === doseKey
-          );
-          
-          if (specificNotification) {
-            await Notifications.cancelScheduledNotificationAsync(specificNotification.identifier);
-            console.log(`🔕 Cancelled specific alarm for ${dose.medicineName} at ${dose.time} (Key: ${doseKey})`);
-          } else {
-            console.log(`⚠️ No specific alarm found to cancel for ${dose.medicineName} at ${dose.time}`);
-          }
-        } catch (error) {
-          console.error('Error cancelling specific alarm:', error);
+        const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
+        const doseKey = `${dose.medicineId}-${dose.time}-${today}`;
+        const specificNotification = allNotifications.find(notification =>
+          notification.content.data?.type === 'medicine' &&
+          notification.content.data?.doseKey === doseKey
+        );
+
+        if (specificNotification) {
+          await Notifications.cancelScheduledNotificationAsync(specificNotification.identifier);
+          console.log(`🔕 Cancelled alarm for ${dose.medicineName} at ${dose.time}`);
         }
       }
-
-      console.log(`Medicine ${taken ? 'marked as taken' : 'marked as not taken'} successfully`);
-
     } catch (error) {
       console.error('Error marking medicine:', error);
-      
-      // Revert the local state if API call fails
-      setTodaySchedule(prev => 
-        prev.map(item => 
+      setTodaySchedule(prev =>
+        prev.map(item =>
           item.medicineId === dose.medicineId && item.time === dose.time
-            ? { ...item, taken: !taken } // Revert to previous state
+            ? { ...item, taken: !taken }
             : item
         )
       );
-      
       Alert.alert('Error', 'Failed to update medicine status. Please try again.');
     } finally {
       setUpdatingMedicine(null);
@@ -844,60 +734,24 @@ const MedicineTracker: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // First, cancel ALL medicine alarms for this specific medicine
-              console.log(`🗑️ Starting deletion process for medicine ID: ${medicineId}`);
               const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
-              console.log(`📋 Found ${allNotifications.length} total scheduled notifications`);
-              
-              // Cancel notifications for this specific medicine
-              const medicineNotifications = allNotifications.filter(notification => 
+              const medicineNotifications = allNotifications.filter(notification =>
                 notification.content.data?.type === 'medicine' &&
                 notification.content.data?.medicineId === medicineId
               );
-              
-              console.log(`💊 Cancelling ${medicineNotifications.length} notifications for medicine ID: ${medicineId}`);
-              
-              for (const notification of medicineNotifications) {
-                const data = notification.content.data;
-                console.log(`🔕 Cancelling alarm for: ${data?.medicineName} at ${data?.time} (ID: ${notification.identifier})`);
-                await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-              }
-              
-              console.log(`✅ Successfully cancelled ${medicineNotifications.length} alarms for medicine ID: ${medicineId}`);
 
-              // Delete the medicine from the database
+              for (const notification of medicineNotifications) {
+                await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+                console.log(`🔕 Cancelled alarm for: ${notification.content.data?.medicineName} at ${notification.content.data?.time}`);
+              }
+
               await deleteMedicineAPI(medicineId);
-              
-              // Update local state immediately
               setMedicines(medicines.filter(m => m.id !== medicineId));
               setMedicineLogs(logs => logs.filter(l => l.medicineId !== medicineId));
-              
-              // Also remove from today's schedule immediately to prevent any issues
               setTodaySchedule(prev => prev.filter(dose => dose.medicineId !== medicineId));
-              
-              // Verify that alarms for the deleted medicine are gone
-              const remainingNotifications = await Notifications.getAllScheduledNotificationsAsync();
-              const remainingMedicineNotifications = remainingNotifications.filter(notification => 
-                notification.content.data?.type === 'medicine' &&
-                notification.content.data?.medicineId === medicineId
-              );
-              
-              if (remainingMedicineNotifications.length === 0) {
-                console.log(`✅ Verification: No alarms remain for deleted medicine ID: ${medicineId}`);
-              } else {
-                console.log(`⚠️ Warning: ${remainingMedicineNotifications.length} alarms still exist for deleted medicine ID: ${medicineId}`);
-                // Force cancel any remaining alarms
-                for (const notification of remainingMedicineNotifications) {
-                  await Notifications.cancelScheduledNotificationAsync(notification.identifier);
-                  console.log(`🔕 Force cancelled remaining alarm: ${notification.identifier}`);
-                }
-              }
-              
-              // Reload today's schedule to get fresh data, but do not trigger auto-scheduling
-              console.log('🔄 Reloading today\'s schedule after deletion...');
+
               await loadTodaySchedule();
-              
-              console.log(`✅ Medicine deleted successfully and alarms cancelled`);
+              console.log(`✅ Medicine deleted successfully`);
             } catch (error) {
               console.error('Error deleting medicine:', error);
               Alert.alert('Error', 'Failed to delete medicine. Please try again.');
@@ -908,7 +762,6 @@ const MedicineTracker: React.FC = () => {
     );
   };
 
-  // Format time for display (convert 24-hour to 12-hour with AM/PM)
   const formatTimeForDisplay = (timeString: string): string => {
     const timeSlot = stringToTimeSlot(timeString);
     return `${timeSlot.hour}:${timeSlot.minute} ${timeSlot.period}`;
@@ -917,109 +770,105 @@ const MedicineTracker: React.FC = () => {
   const renderTodaySchedule = () => {
     if (loadingToday) {
       return (
-        <View className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl mx-4 mt-4 border border-white/20">
-          <ActivityIndicator size="large" color="#ffffff" />
-          <Text className="text-white/80 text-center mt-2">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#afa0cf" />
+          <Text style={styles.loadingText}>
             Loading today's schedule...
           </Text>
         </View>
       );
     }
-
     if (todaySchedule.length === 0) {
       return (
-        <View className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl mx-4 mt-4 border border-white/20">
-          <Text className="text-white/80 text-center">
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
             No medicines scheduled for today
           </Text>
         </View>
       );
     }
-
     return (
-      <View className="px-5 mt-4">
-        <View className="flex-row justify-between items-center mb-4">
-          <Text className="text-xl font-light text-black">
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
             Today's Schedule
           </Text>
           <TouchableOpacity
-            className="bg-gray-200 rounded-full p-2"
+            style={styles.refreshButton}
             onPress={loadTodaySchedule}
             disabled={loadingToday}
           >
-            <Ionicons 
-              name="refresh" 
-              size={20} 
-              color="black" 
+            <Ionicons
+              name="refresh"
+              size={20}
+              color="#afa0cf"
             />
           </TouchableOpacity>
         </View>
         {todaySchedule.map((dose, index) => (
           <View
             key={`${dose.medicineId}-${dose.time}-${index}`}
-            className={`p-4 rounded-2xl mb-4 border bg-white ${
+            style={[
+              styles.medicineCard,
               dose.taken === true
-                ? 'border-green-300 shadow-sm'
+                ? styles.takenCard
                 : dose.taken === false
-                ? 'border-red-300 shadow-sm'
-                : 'border-gray-200 shadow-sm'
-            }`}
+                ? styles.skippedCard
+                : styles.pendingCard
+            ]}
           >
-            <View className="flex-row justify-between items-center">
-              <View className="flex-1">
-                <Text className="font-semibold text-lg text-black">
+            <View style={styles.medicineCardContent}>
+              <View style={styles.medicineInfo}>
+                <Text style={styles.medicineName}>
                   {dose.medicineName}
                 </Text>
-                <Text className="text-gray-600">
+                <Text style={styles.medicineDetails}>
                   {dose.dosage} at {formatTimeForDisplay(dose.time)}
                 </Text>
               </View>
               {!completedDoses.has(`${dose.medicineId}-${dose.time}`) && (
-                <View className="flex-row">
+                <View style={styles.actionButtons}>
                   <TouchableOpacity
-                    className={`w-12 h-12 rounded-full mr-2 items-center justify-center ${
-                      dose.taken === true
-                        ? 'bg-green-500'
-                        : 'bg-gray-200'
-                    }`}
+                    style={[
+                      styles.actionButton,
+                      dose.taken === true ? styles.takenButton : styles.defaultButton
+                    ]}
                     onPress={() => markMedicineTaken(dose, true)}
                     disabled={updatingMedicine === `${dose.medicineId}-${dose.time}`}
                   >
                     {updatingMedicine === `${dose.medicineId}-${dose.time}` ? (
-                      <ActivityIndicator size="small" color={dose.taken === true ? 'white' : '#000000'} />
+                      <ActivityIndicator size="small" color={dose.taken === true ? 'white' : '#afa0cf'} />
                     ) : (
-                      <Ionicons 
-                        name="checkmark" 
-                        size={24} 
-                        color={dose.taken === true ? 'white' : '#000000'} 
+                      <Ionicons
+                        name="checkmark"
+                        size={24}
+                        color={dose.taken === true ? 'white' : '#afa0cf'}
                       />
                     )}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    className={`w-12 h-12 rounded-full items-center justify-center ${
-                      dose.taken === false
-                        ? 'bg-red-500'
-                        : 'bg-gray-200'
-                    }`}
+                    style={[
+                      styles.actionButton,
+                      dose.taken === false ? styles.skippedButton : styles.defaultButton
+                    ]}
                     onPress={() => markMedicineTaken(dose, false)}
                     disabled={updatingMedicine === `${dose.medicineId}-${dose.time}`}
                   >
                     {updatingMedicine === `${dose.medicineId}-${dose.time}` ? (
-                      <ActivityIndicator size="small" color={dose.taken === false ? 'white' : '#000000'} />
+                      <ActivityIndicator size="small" color={dose.taken === false ? 'white' : '#afa0cf'} />
                     ) : (
-                      <Ionicons 
-                        name="close" 
-                        size={24} 
-                        color={dose.taken === false ? 'white' : '#000000'} 
+                      <Ionicons
+                        name="close"
+                        size={24}
+                        color={dose.taken === false ? 'white' : '#afa0cf'}
                       />
                     )}
                   </TouchableOpacity>
                 </View>
               )}
-              
               {completedDoses.has(`${dose.medicineId}-${dose.time}`) && (
-                <View className="items-center">
-                  <Text className="text-gray-600 text-sm font-medium">
+                <View style={styles.statusContainer}>
+                  <Text style={styles.statusText}>
                     {dose.taken ? '✓ Taken' : '✗ Skipped'}
                   </Text>
                 </View>
@@ -1034,60 +883,60 @@ const MedicineTracker: React.FC = () => {
   const renderMedicinesList = () => {
     if (loadingMedicines) {
       return (
-        <View className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl mx-4 mt-4 border border-white/20">
-          <ActivityIndicator size="large" color="#ffffff" />
-          <Text className="text-white/80 text-center mt-2">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#afa0cf" />
+          <Text style={styles.loadingText}>
             Loading medicines...
           </Text>
         </View>
       );
     }
-
     if (medicines.length === 0) {
       return (
-        <View className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl mx-4 mt-4 border border-white/20">
-          <Text className="text-white/80 text-center">
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>
             No medicines added yet
           </Text>
         </View>
       );
     }
-
     return (
-      <View className="px-5 mt-6">
-        <Text className="text-xl font-light mb-4 text-black">
-          My Medicines
-        </Text>
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            My Medicines
+          </Text>
+        </View>
         {medicines.map(medicine => (
           <View
             key={medicine.id}
-            className="p-4 bg-white rounded-2xl mb-4 border border-gray-200 shadow-sm"
+            style={styles.medicineCard}
           >
-            <View className="flex-row justify-between items-start">
-              <View className="flex-1">
-                <Text className="font-semibold text-lg text-black">
+            <View style={styles.medicineCardContent}>
+              <View style={styles.medicineInfo}>
+                <Text style={styles.medicineName}>
                   {medicine.name}
                 </Text>
-                <Text className="text-gray-600 mt-1">
+                <Text style={styles.medicineDetails}>
                   Dosage: {medicine.dosage}
                 </Text>
-                <Text className="text-gray-600">
+                <Text style={styles.medicineDetails}>
                   Times: {medicine.times.map(formatTimeForDisplay).join(', ')}
                 </Text>
-                <Text className="text-gray-600">
+                <Text style={styles.medicineDetails}>
                   From: {medicine.startDate} {medicine.endDate && `to ${medicine.endDate}`}
                 </Text>
                 {medicine.notes && (
-                  <Text className="text-gray-500 text-sm mt-1">
+                  <Text style={styles.medicineNotes}>
                     Notes: {medicine.notes}
                   </Text>
                 )}
               </View>
               <TouchableOpacity
-                className="p-2"
+                style={styles.deleteButton}
                 onPress={() => deleteMedicine(medicine.id)}
               >
-                <Ionicons name="trash-outline" size={24} color="#000000" />
+                <Ionicons name="trash-outline" size={24} color="#afa0cf" />
               </TouchableOpacity>
             </View>
           </View>
@@ -1097,14 +946,12 @@ const MedicineTracker: React.FC = () => {
   };
 
   const renderTimePicker = (timeSlot: TimeSlot, index: number) => (
-    <View key={index} className="flex-row mb-2 items-center">
-      <View className="flex-1 flex-row items-center">
-        {/* Hour */}
+    <View key={index} style={styles.timePickerRow}>
+      <View style={styles.timePickerContent}>
         <TextInput
-          className="flex-1 border border-gray-300 rounded-xl p-2 mr-2 text-center text-base bg-white text-gray-800"
+          style={styles.timeInput}
           value={timeSlot.hour}
           onChangeText={(text) => {
-            // Allow empty string or valid hours (1-12)
             if (text === '' || (parseInt(text) >= 1 && parseInt(text) <= 12)) {
               updateTimeSlot(index, 'hour', text);
             }
@@ -1114,14 +961,11 @@ const MedicineTracker: React.FC = () => {
           keyboardType="numeric"
           maxLength={2}
         />
-        <Text className="text-gray-700 mx-1 font-semibold text-lg">:</Text>
-        
-        {/* Minute */}
+        <Text style={styles.timeSeparator}>:</Text>
         <TextInput
-          className="flex-1 border border-gray-300 rounded-xl p-2 mr-2 text-center text-base bg-white text-gray-800"
+          style={styles.timeInput}
           value={timeSlot.minute}
           onChangeText={(text) => {
-            // Allow empty string or valid minutes (0-59)
             if (text === '' || (parseInt(text) >= 0 && parseInt(text) <= 59)) {
               updateTimeSlot(index, 'minute', text);
             }
@@ -1131,32 +975,40 @@ const MedicineTracker: React.FC = () => {
           keyboardType="numeric"
           maxLength={2}
         />
-        
-        {/* AM/PM */}
-        <View className="flex-row border border-gray-300 rounded-xl overflow-hidden bg-white">
+        <View style={styles.periodContainer}>
           <TouchableOpacity
-            className={`px-3 py-2 ${timeSlot.period === 'AM' ? 'bg-blue-500' : 'bg-gray-100'}`}
+            style={[
+              styles.periodButton,
+              timeSlot.period === 'AM' && styles.periodButtonActive
+            ]}
             onPress={() => updateTimeSlot(index, 'period', 'AM')}
           >
-            <Text className={`text-sm font-semibold ${timeSlot.period === 'AM' ? 'text-white' : 'text-gray-700'}`}>
+            <Text style={[
+              styles.periodButtonText,
+              timeSlot.period === 'AM' && styles.periodButtonTextActive
+            ]}>
               AM
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            className={`px-3 py-2 ${timeSlot.period === 'PM' ? 'bg-blue-500' : 'bg-gray-100'}`}
+            style={[
+              styles.periodButton,
+              timeSlot.period === 'PM' && styles.periodButtonActive
+            ]}
             onPress={() => updateTimeSlot(index, 'period', 'PM')}
           >
-            <Text className={`text-sm font-semibold ${timeSlot.period === 'PM' ? 'text-white' : 'text-gray-700'}`}>
+            <Text style={[
+              styles.periodButtonText,
+              timeSlot.period === 'PM' && styles.periodButtonTextActive
+            ]}>
               PM
             </Text>
           </TouchableOpacity>
         </View>
       </View>
-      
-      {/* Delete button - always show if more than 1 time slot */}
       {formData.times.length > 1 && (
         <TouchableOpacity
-          className="ml-2 p-2 bg-red-100 rounded-full"
+          style={styles.removeTimeButton}
           onPress={() => removeTimeSlot(index)}
         >
           <Ionicons name="close-circle" size={18} color="#EF4444" />
@@ -1170,8 +1022,6 @@ const MedicineTracker: React.FC = () => {
     if (selectedDate) {
       const dateString = selectedDate.toISOString().split('T')[0];
       setFormData({...formData, startDate: dateString});
-      
-      // If end date is before start date, clear it
       if (formData.endDate && formData.endDate < dateString) {
         setFormData(prev => ({...prev, endDate: ''}));
       }
@@ -1187,108 +1037,96 @@ const MedicineTracker: React.FC = () => {
   };
 
   const renderMainContent = () => (
-    <View className="flex-1" style={{ paddingHorizontal: 0 }}>
-      <View className="items-center px-4 py-4 bg-transparent mt-8">
-        <Text className="text-2xl font-bold text-black">
+    <View style={styles.mainContainer}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>
           Medicine Tracker
         </Text>
       </View>
-      
-      <View className="px-4 pb-4">
-        <Text className="text-white/80 text-center italic text-base">
+      <View style={styles.subtitleContainer}>
+        <Text style={styles.subtitleText}>
           Consistency is the key to recovery
         </Text>
       </View>
-      
-      <View className="items-center px-4 pb-4">
+      <View style={styles.addButtonContainer}>
         <TouchableOpacity
-          className="bg-white/20 backdrop-blur-sm rounded-full w-16 h-16 items-center justify-center"
+          style={styles.addButton}
           onPress={() => setShowAddModal(true)}
         >
           <Ionicons name="add" size={32} color="white" />
         </TouchableOpacity>
       </View>
-
-      <ScrollView 
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 0 }}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {renderTodaySchedule()}
         {renderMedicinesList()}
-        
-        {/* Medicine Alarms Settings */}
-        <View className="px-5 mt-6">
-          <View className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-            <Text className="text-xl text-white font-semibold text-center mb-3">
-              🔔 Auto Medicine Alarms
-            </Text>
-            
-            <View className="flex-row items-center justify-center mb-3">
-              <Text className="text-sm text-white/80 mr-2">
+        <View style={styles.sectionContainer}>
+          <View style={styles.alarmSettingsCard}>
+            <View style={styles.alarmSettingsTitleContainer}>
+              <Ionicons name="notifications" size={20} color="#afa0cf" />
+              <Text style={styles.alarmSettingsTitle}>
+                Auto Medicine Alarms
+              </Text>
+            </View>
+            <View style={styles.alarmToggleContainer}>
+              <Text style={styles.alarmToggleText}>
                 {medicineAlarmsEnabled ? 'Auto Alarms On' : 'Auto Alarms Off'}
               </Text>
               <Switch
                 value={medicineAlarmsEnabled}
                 onValueChange={setMedicineAlarmsEnabled}
-                trackColor={{ false: '#E5E7EB', true: '#11B5CF' }}
+                trackColor={{ false: '#E5E7EB', true: '#afa0cf' }}
                 thumbColor={medicineAlarmsEnabled ? '#ffffff' : '#9CA3AF'}
               />
             </View>
-            
             {medicineAlarmsEnabled && (
-              <View className="flex-row items-center justify-between mb-3 px-4">
-                <Text className="text-sm text-white/80">Vibration</Text>
+              <View style={styles.vibrationToggleContainer}>
+                <Text style={styles.vibrationToggleText}>Vibration</Text>
                 <Switch
                   value={medicineAlarmVibration}
                   onValueChange={setMedicineAlarmVibration}
-                  trackColor={{ false: '#E5E7EB', true: '#11B5CF' }}
+                  trackColor={{ false: '#E5E7EB', true: '#afa0cf' }}
                   thumbColor={medicineAlarmVibration ? '#ffffff' : '#9CA3AF'}
                 />
               </View>
             )}
-            
             {medicineAlarmsEnabled ? (
-              <Text className="text-sm text-white/60 text-center italic">
+              <Text style={styles.alarmStatusText}>
                 Alarms will trigger automatically at medicine times
               </Text>
             ) : (
-              <Text className="text-base text-white/60 text-center italic">
+              <Text style={styles.alarmStatusText}>
                 Medicine alarms are currently disabled
               </Text>
             )}
           </View>
         </View>
-
-        {/* Add Medicine Section */}
-        <View className="px-5 mt-6 mb-8">
+        <View style={styles.addMedicineSection}>
           <TouchableOpacity
-            className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 items-center flex-row justify-center border border-white/30"
+            style={styles.addMedicineButton}
             onPress={() => setShowAddModal(true)}
           >
-            <Ionicons name="add-circle" size={32} color="white" />
-            <Text className="text-white font-semibold text-xl ml-3">
+            <Ionicons name="add-circle" size={32} color="#afa0cf" />
+            <Text style={styles.addMedicineButtonText}>
               Add Medicine
             </Text>
           </TouchableOpacity>
         </View>
-
-
-
-        {/* Alarm Status Display */}
         {medicineAlarmsEnabled && (
-          <View className="px-5 mt-4 mb-8">
-            <View className="bg-green-500/10 backdrop-blur-sm rounded-2xl p-4 border border-green-300/20">
-              <Text className="text-white font-semibold text-center mb-2">
+          <View style={styles.alarmStatusContainer}>
+            <View style={styles.alarmStatusCard}>
+              <Text style={styles.alarmStatusTitle}>
                 ✅ Automatic Alarms Active
               </Text>
-              <Text className="text-white/80 text-center text-sm">
+              <Text style={styles.alarmStatusSubtitle}>
                 {todaySchedule.filter(dose => !dose.taken).length} pending alarms for today
               </Text>
             </View>
           </View>
         )}
-
       </ScrollView>
     </View>
   );
@@ -1299,23 +1137,27 @@ const MedicineTracker: React.FC = () => {
       animationType="fade"
       transparent={true}
     >
-      <View className="flex-1 bg-black/50">
-        {/* Blurred Background */}
-        <BlurView 
-          intensity={10} 
-          style={{ flex: 1 }}
-          className="justify-center items-center px-4 py-4"
+      <View style={styles.modalOverlay}>
+        <BlurView
+          intensity={100}
+          style={styles.modalBlurView}
         >
-          <View className="bg-white rounded-3xl w-full max-w-sm flex-1 max-h-[90%] shadow-2xl">
-            <View className="flex-row justify-between items-center p-5 border-b border-gray-200">
-              <Text className="text-xl font-bold text-gray-800">Add Medicine</Text>
+          <View
+            style={styles.modalContent}
+            onTouchStart={() => {
+              if (showDosageDropdown) {
+                setShowDosageDropdown(false);
+              }
+            }}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Medicine</Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
                 <Ionicons name="close" size={24} color="#000000" />
               </TouchableOpacity>
             </View>
-
-            <ScrollView 
-              className="flex-1 px-5 py-4" 
+            <ScrollView
+              style={styles.modalScrollView}
               showsVerticalScrollIndicator={false}
               onTouchStart={() => {
                 if (showDosageDropdown) {
@@ -1323,53 +1165,67 @@ const MedicineTracker: React.FC = () => {
                 }
               }}
             >
-              <View className="mb-4">
-                <Text className="text-gray-700 mb-2 text-base font-medium">Medicine Name *</Text>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Medicine Name *</Text>
                 <TextInput
-                  className="border border-gray-300 rounded-xl p-3 text-base bg-white"
+                  style={styles.formInput}
                   value={formData.name}
                   onChangeText={(text) => setFormData({...formData, name: text})}
                   placeholder="Enter medicine name"
                 />
               </View>
-
-              <View className="mb-4">
-                <Text className="text-gray-700 mb-2 text-base font-medium">Dosage *</Text>
-                <View className="relative">
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Dosage *</Text>
+                <View
+                  style={styles.dosageDropdownContainer}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
                   <TouchableOpacity
-                    className="border border-gray-300 rounded-xl p-3 flex-row justify-between items-center bg-white"
-                    onPress={() => setShowDosageDropdown(!showDosageDropdown)}
+                    style={styles.dosageDropdownButton}
+                    onPress={() => {
+                      console.log('Current dosageType:', formData.dosageType);
+                      setShowDosageDropdown(!showDosageDropdown);
+                    }}
                   >
-                    <Text className="text-gray-800 text-base">
+                    <Text style={styles.dosageDropdownText}>
                       {formData.dosageType}
                     </Text>
-                    <Ionicons 
-                      name={showDosageDropdown ? "chevron-up" : "chevron-down"} 
-                      size={20} 
-                      color="#6B7280" 
+                    <Ionicons
+                      name={showDosageDropdown ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color="#6B7280"
                     />
                   </TouchableOpacity>
-                  
                   {showDosageDropdown && (
-                    <View className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-xl mt-1 z-50 max-h-48">
-                      <ScrollView className="max-h-48">
+                    <View style={styles.dosageDropdown}>
+                      <ScrollView
+                        style={styles.dosageDropdownScroll}
+                        showsVerticalScrollIndicator={false}
+                      >
                         {dosageOptions.map((option) => (
                           <TouchableOpacity
                             key={option}
-                            className={`p-3 border-b border-gray-100 ${
-                              formData.dosageType === option ? 'bgWarnings-blue-50' : ''
-                            }`}
+                            style={[
+                              styles.dosageOption,
+                              formData.dosageType === option && styles.dosageOptionActive
+                            ]}
+                            activeOpacity={0.7}
                             onPress={() => {
-                              setFormData({...formData, dosageType: option});
-                              if (option !== 'Other') {
-                                setFormData(prev => ({...prev, customDosage: ''}));
-                              }
+                              console.log('Selecting dosage option:', option);
+                              setFormData(prev => ({
+                                ...prev,
+                                dosageType: option,
+                                customDosage: option !== 'Other' ? '' : prev.customDosage
+                              }));
                               setShowDosageDropdown(false);
                             }}
                           >
-                            <Text className={`text-base ${
-                              formData.dosageType === option ? 'text-blue-600 font-semibold' : 'text-gray-800'
-                            }`}>
+                            <Text style={[
+                              styles.dosageOptionText,
+                              formData.dosageType === option && styles.dosageOptionTextActive
+                            ]}>
                               {option}
                             </Text>
                           </TouchableOpacity>
@@ -1378,59 +1234,60 @@ const MedicineTracker: React.FC = () => {
                     </View>
                   )}
                 </View>
-                
                 {formData.dosageType === 'Other' && (
                   <TextInput
-                    className="border border-gray-300 rounded-xl p-3 mt-2 text-base bg-white"
+                    style={styles.formInput}
                     value={formData.customDosage}
                     onChangeText={(text) => setFormData({...formData, customDosage: text})}
                     placeholder="Enter custom dosage (e.g., 1.5 tablets, 3ml, etc.) *"
                   />
                 )}
               </View>
-
-              <View className="mb-4">
-                <Text className="text-gray-700 mb-2 text-base font-medium">Times *</Text>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Times *</Text>
                 {formData.times.map((timeSlot, index) => renderTimePicker(timeSlot, index))}
                 <TouchableOpacity
-                  className="border border-dashed border-gray-400 rounded-xl p-3 items-center flex-row justify-center bg-gray-50 mt-2"
+                  style={styles.addTimeButton}
                   onPress={addTimeSlot}
                 >
                   <Ionicons name="add-circle-outline" size={18} color="#6B7280" />
-                  <Text className="text-gray-600 ml-2 text-base font-medium">Add Time</Text>
+                  <Text style={styles.addTimeButtonText}>Add Time</Text>
                 </TouchableOpacity>
               </View>
-
-              <View className="mb-4">
-                <Text className="text-gray-700 mb-2 text-base font-medium">Start Date *</Text>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Start Date *</Text>
                 <TouchableOpacity
-                  className="border border-gray-300 rounded-xl p-3 flex-row justify-between items-center bg-white"
+                  style={styles.dateButton}
                   onPress={() => setShowStartDatePicker(true)}
                 >
-                  <Text className={formData.startDate ? 'text-gray-800' : 'text-gray-500'} style={{fontSize: 16}}>
+                  <Text style={[
+                    styles.dateButtonText,
+                    !formData.startDate && styles.dateButtonPlaceholder
+                  ]}>
                     {formData.startDate || 'Select start date'}
                   </Text>
                   <Ionicons name="calendar-outline" size={18} color="#6B7280" />
                 </TouchableOpacity>
               </View>
-
-              <View className="mb-4">
-                <Text className="text-gray-700 mb-2 text-base font-medium">End Date (Optional)</Text>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>End Date (Optional)</Text>
                 <TouchableOpacity
-                  className="border border-gray-300 rounded-xl p-3 flex-row justify-between items-center bg-white"
+                  style={styles.dateButton}
                   onPress={() => setShowEndDatePicker(true)}
                 >
-                  <Text className={formData.endDate ? 'text-gray-800' : 'text-gray-500'} style={{fontSize: 16}}>
+                  <Text style={[
+                    styles.dateButtonText,
+                    !formData.endDate && styles.dateButtonPlaceholder
+                  ]}>
                     {formData.endDate || 'Select end date'}
                   </Text>
                   <Ionicons name="calendar-outline" size={18} color="#6B7280" />
                 </TouchableOpacity>
               </View>
-
-              <View className="mb-6">
-                <Text className="text-gray-700 mb-2 text-base font-medium">Notes</Text>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Notes</Text>
                 <TextInput
-                  className="border border-gray-300 rounded-xl p-3 text-base bg-white"
+                  style={styles.formTextArea}
                   value={formData.notes}
                   onChangeText={(text) => setFormData({...formData, notes: text})}
                   placeholder="Additional notes..."
@@ -1439,11 +1296,11 @@ const MedicineTracker: React.FC = () => {
                   textAlignVertical="top"
                 />
               </View>
-
               <TouchableOpacity
-                className={`rounded-xl p-4 items-center flex-row justify-center mb-8 ${
-                  loading ? 'bg-gray-400' : 'bg-black'
-                }`}
+                style={[
+                  styles.submitButton,
+                  loading && styles.submitButtonDisabled
+                ]}
                 onPress={addMedicine}
                 disabled={loading}
               >
@@ -1452,13 +1309,11 @@ const MedicineTracker: React.FC = () => {
                 ) : (
                   <Ionicons name="medical-outline" size={20} color="white" />
                 )}
-                <Text className="text-white font-semibold text-base ml-2">
+                <Text style={styles.submitButtonText}>
                   {loading ? 'Adding...' : 'Add Medicine'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
-
-            {/* Date Pickers */}
             {showStartDatePicker && (
               <DateTimePicker
                 value={new Date(formData.startDate)}
@@ -1468,7 +1323,6 @@ const MedicineTracker: React.FC = () => {
                 minimumDate={new Date()}
               />
             )}
-
             {showEndDatePicker && (
               <DateTimePicker
                 value={formData.endDate ? new Date(formData.endDate) : new Date()}
@@ -1484,25 +1338,20 @@ const MedicineTracker: React.FC = () => {
     </Modal>
   );
 
-  // Debug function to check alarm status
   const debugAlarmStatus = async () => {
     try {
       console.log('🔍 Debugging alarm status...');
-      
-      // Check permissions
       const { status } = await Notifications.getPermissionsAsync();
       console.log('📱 Notification permissions:', status);
-      
-      // Check scheduled notifications
+
       const allNotifications = await Notifications.getAllScheduledNotificationsAsync();
-      const medicineNotifications = allNotifications.filter(notification => 
+      const medicineNotifications = allNotifications.filter(notification =>
         notification.content.data?.type === 'medicine'
       );
-      
+
       console.log('📋 Total scheduled notifications:', allNotifications.length);
       console.log('💊 Medicine notifications:', medicineNotifications.length);
-      
-      // Log details of each medicine notification
+
       medicineNotifications.forEach((notification, index) => {
         const data = notification.content.data;
         console.log(`💊 Medicine ${index + 1}:`, {
@@ -1512,45 +1361,32 @@ const MedicineTracker: React.FC = () => {
           trigger: notification.trigger,
         });
       });
-      
-      // Check today's schedule
+
       console.log('📅 Today\'s schedule:', todaySchedule.map(d => ({
         name: d.medicineName,
         time: d.time,
         taken: d.taken,
         status: d.taken === true ? 'Taken' : d.taken === false ? 'Skipped' : 'Pending'
       })));
-      
-      // Check which doses would be discarded (missed)
-      const now = new Date();
+
       const missedDoses = todaySchedule.filter(dose => {
         const [hour, minute] = dose.time.split(':').map(Number);
         const doseTime = new Date();
         doseTime.setHours(hour, minute, 0, 0);
-        return doseTime <= now && dose.taken === null;
+        return doseTime <= new Date() && dose.taken === null;
       });
-      
+
       if (missedDoses.length > 0) {
-        console.log('⏰ Missed doses (will be discarded):', missedDoses.map(d => ({
+        console.log('⏰ Missed doses:', missedDoses.map(d => ({
           name: d.medicineName,
           time: d.time,
         })));
       }
-      
-      // Check alarm settings
+
       console.log('🔔 Alarm settings:', {
         enabled: medicineAlarmsEnabled,
         vibration: medicineAlarmVibration,
       });
-      
-      // Calculate missed doses
-      const currentTime = new Date();
-      const missedDosesCount = todaySchedule.filter(dose => {
-        const [hour, minute] = dose.time.split(':').map(Number);
-        const doseTime = new Date();
-        doseTime.setHours(hour, minute, 0, 0);
-        return doseTime <= currentTime && dose.taken === null;
-      }).length;
 
       return {
         permissions: status,
@@ -1558,7 +1394,7 @@ const MedicineTracker: React.FC = () => {
         medicineNotifications: medicineNotifications.length,
         todayScheduleCount: todaySchedule.length,
         alarmsEnabled: medicineAlarmsEnabled,
-        missedDoses: missedDosesCount,
+        missedDoses: missedDoses.length,
       };
     } catch (error) {
       console.error('Error debugging alarm status:', error);
@@ -1567,25 +1403,534 @@ const MedicineTracker: React.FC = () => {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: '#73C8A9' }}>
-      <SafeAreaView className="flex-1" style={{ paddingHorizontal: 0 }}>
-        {/* Main Content - this will be blurred when modal is open */}
-        {showAddModal && (
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }}>
-            <BlurView intensity={20} style={{ flex: 1 }}>
-              {renderMainContent()}
-            </BlurView>
-          </View>
-        )}
-        
-        {/* Normal content when modal is closed */}
-        {!showAddModal && renderMainContent()}
-
-        {/* Modal */}
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        {renderMainContent()}
         {renderAddMedicineModal()}
       </SafeAreaView>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#D3CCE3',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  mainContainer: {
+    flex: 1,
+    paddingHorizontal: 0,
+  },
+  header: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  subtitleContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  subtitleText: {
+    color: '#6b7280',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    fontSize: 12,
+  },
+  addButtonContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  addButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 32,
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#afa0cf',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 0,
+  },
+  sectionContainer: {
+    paddingHorizontal: 20,
+    marginTop: 24,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  refreshButton: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 20,
+    padding: 8,
+  },
+  loadingContainer: {
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 12,
+  },
+  emptyContainer: {
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#6b7280',
+    textAlign: 'center',
+    fontSize: 12,
+  },
+  medicineCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  takenCard: {
+    borderColor: '#10b981',
+    shadowColor: '#10b981',
+  },
+  skippedCard: {
+    borderColor: '#ef4444',
+    shadowColor: '#ef4444',
+  },
+  pendingCard: {
+    borderColor: '#d1d5db',
+    shadowColor: '#d1d5db',
+  },
+  medicineCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  medicineInfo: {
+    flex: 1,
+  },
+  medicineName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  medicineDetails: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  medicineNotes: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+  },
+  actionButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  defaultButton: {
+    backgroundColor: '#f3f4f6',
+  },
+  takenButton: {
+    backgroundColor: '#10b981',
+  },
+  skippedButton: {
+    backgroundColor: '#ef4444',
+  },
+  statusContainer: {
+    alignItems: 'center',
+  },
+  statusText: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    padding: 8,
+  },
+  alarmSettingsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+  },
+  alarmSettingsTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  alarmSettingsTitle: {
+    fontSize: 20,
+    color: '#afa0cf',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginLeft: 8,
+  },
+  alarmToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  alarmToggleText: {
+    fontSize: 14,
+    color: '#afa0cf',
+    marginRight: 8,
+  },
+  vibrationToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  vibrationToggleText: {
+    fontSize: 14,
+    color: '#afa0cf',
+  },
+  alarmStatusText: {
+    fontSize: 14,
+    color: '#afa0cf',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  addMedicineSection: {
+    paddingHorizontal: 20,
+    marginTop: 24,
+    marginBottom: 32,
+  },
+  addMedicineButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#afa0cf',
+  },
+  addMedicineButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 20,
+    marginLeft: 12,
+  },
+  alarmStatusContainer: {
+    paddingHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 32,
+  },
+  alarmStatusCard: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    alignItems: 'center',
+  },
+  alarmStatusTitle: {
+    color: '#ffffff',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontSize: 18,
+  },
+  alarmStatusSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  modalBlurView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  modalContent: {
+    backgroundColor: '#D3CCE3',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 400,
+    flex: 1,
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  modalScrollView: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  formField: {
+    marginBottom: 16,
+  },
+  formLabel: {
+    color: '#1f2937',
+    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+  },
+  formTextArea: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+    minHeight: 80,
+  },
+  dosageDropdownContainer: {
+    position: 'relative',
+    zIndex: 9999,
+  },
+  dosageDropdownButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  dosageDropdownText: {
+    color: '#1f2937',
+    fontSize: 16,
+  },
+  dosageDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    marginTop: 4,
+    zIndex: 9999,
+    maxHeight: 300,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  dosageDropdownScroll: {
+    maxHeight: 300,
+  },
+  dosageOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  dosageOptionActive: {
+    backgroundColor: '#f3f4f6',
+  },
+  dosageOptionText: {
+    fontSize: 16,
+    color: '#1f2937',
+  },
+  dosageOptionTextActive: {
+    color: '#1f2937',
+    fontWeight: '600',
+  },
+  timePickerRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  timePickerContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    padding: 8,
+    marginRight: 8,
+    textAlign: 'center',
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+    color: '#1f2937',
+  },
+  timeSeparator: {
+    color: '#374151',
+    marginHorizontal: 4,
+    fontWeight: '600',
+    fontSize: 20,
+  },
+  periodContainer: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+  },
+  periodButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  periodButtonActive: {
+    backgroundColor: '#000000',
+  },
+  periodButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  periodButtonTextActive: {
+    color: '#ffffff',
+  },
+  removeTimeButton: {
+    marginLeft: 8,
+    padding: 8,
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+  },
+  addTimeButton: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#9ca3af',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    backgroundColor: '#f9fafb',
+    marginTop: 8,
+  },
+  addTimeButtonText: {
+    color: '#6b7280',
+    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  dateButtonText: {
+    color: '#374151',
+    fontSize: 18,
+  },
+  dateButtonPlaceholder: {
+    color: '#9ca3af',
+  },
+  submitButton: {
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 32,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 18,
+    marginLeft: 8,
+  },
+});
 
 export default MedicineTracker;
